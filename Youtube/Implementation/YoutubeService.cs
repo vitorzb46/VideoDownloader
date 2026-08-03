@@ -6,7 +6,7 @@ namespace VideoDownloader.Youtube.Implementation;
 
 public class YoutubeService(YoutubeClient yt, ConversionRequestBuilder crb)
 {
-    public async Task DownloadVideoAsync(string videoUrl)
+    public async Task DownloadVideoAsync(string videoUrl, string qualidade = "1080p60")
     {
         var streamManifest = await yt.Videos.Streams.GetManifestAsync(videoUrl);
         var audioStreamInfo = streamManifest
@@ -17,7 +17,7 @@ public class YoutubeService(YoutubeClient yt, ConversionRequestBuilder crb)
         var videoStreamInfo = streamManifest
             .GetVideoStreams()
             .Where(s => s.Container == Container.Mp4)
-            .First(s => s.VideoQuality.Label == "1080p60");
+            .First(QualidadeDoVideo(qualidade));
 
         await yt.Videos.DownloadAsync([audioStreamInfo, videoStreamInfo], crb.Build());
     }
@@ -30,6 +30,25 @@ public class YoutubeService(YoutubeClient yt, ConversionRequestBuilder crb)
                 await yt.Videos.DownloadAsync(video.Id, crb.Build());
             }
         }
+    }
+    private static Func<IVideoStreamInfo, bool> QualidadeDoVideo(string qualidade)
+    {
+        return qualidade switch
+        {
+            "2160p60" => s => s.VideoQuality.Label == "2160p60",
+            "2160p" => s => s.VideoQuality.Label == "2160p",
+            "1440p60" => s => s.VideoQuality.Label == "1440p60",
+            "1440p" => s => s.VideoQuality.Label == "1440p",
+            "1080p60" => s => s.VideoQuality.Label == "1080p60",
+            "1080p" => s => s.VideoQuality.Label == "1080p",
+            "720p60" => s => s.VideoQuality.Label == "720p60",
+            "720p" => s => s.VideoQuality.Label == "720p",
+            "480p" => s => s.VideoQuality.Label == "480p",
+            "360p" => s => s.VideoQuality.Label == "360p",
+            "240p" => s => s.VideoQuality.Label == "240p",
+            "144p" => s => s.VideoQuality.Label == "144p",
+            _ => throw new ArgumentException("Qualidade de vídeo inválida."),
+        };
     }
 }
 
