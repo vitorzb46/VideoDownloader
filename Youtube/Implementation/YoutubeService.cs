@@ -1,35 +1,57 @@
+using System.Diagnostics.CodeAnalysis;
+using Xabe.FFmpeg.Downloader;
 using YoutubeExplode;
 using YoutubeExplode.Converter;
 using YoutubeExplode.Videos.Streams;
 
 namespace VideoDownloader.Youtube.Implementation;
 
-public class YoutubeService(YoutubeClient yt, ConversionRequestBuilder crb)
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
+internal sealed class YoutubeService(YoutubeClient yt)
 {
-    public async Task DownloadVideoAsync(string videoUrl, string qualidade = "1080p60")
+    public async Task DownloadAudioAsync(string videoUrl)
     {
-        var streamManifest = await yt.Videos.Streams.GetManifestAsync(videoUrl);
-        var audioStreamInfo = streamManifest
-            .GetAudioStreams()
-            .Where(s => s.Container == Container.Mp4)
-            .GetWithHighestBitrate();
+        var video = await yt.Videos.GetAsync(videoUrl).ConfigureAwait(false);
+        IAudioStreamInfo audioStreamInfo = await AudioStream(videoUrl).ConfigureAwait(false);
+        string extensao = audioStreamInfo.Container == Container.Mp4 ? "m4a" : audioStreamInfo.Container.Name;
+        var caminho = SaidaDoArquivo($"{TituloLimpo(video.Title)}", extensao);
+        await yt.Videos.Streams.DownloadAsync(audioStreamInfo, caminho).ConfigureAwait(false);
+    }
+    public async Task DownloadVideoAsync(string videoUrl, string qualidade = "1080p")
+    {
+        await VerificarFFmpeg().ConfigureAwait(false);
+        var video = await yt.Videos.GetAsync(videoUrl).ConfigureAwait(false);
+        var request = CriarRequisicao($"{TituloLimpo(video.Title)}", "mp4");
 
-        var videoStreamInfo = streamManifest
-            .GetVideoStreams()
-            .Where(s => s.Container == Container.Mp4)
-            .First(QualidadeDoVideo(qualidade));
+        IAudioStreamInfo audioStreamInfo = await AudioStream(videoUrl).ConfigureAwait(false);
+        IVideoStreamInfo videoStreamInfo = await VideoStream(videoUrl, qualidade).ConfigureAwait(false);
+        await yt.Videos.DownloadAsync([audioStreamInfo, videoStreamInfo], request).ConfigureAwait(false);
 
-        await yt.Videos.DownloadAsync([audioStreamInfo, videoStreamInfo], crb.Build());
+        Console.WriteLine($"Qualidade do vídeo: {qualidade}\n");
     }
     public async Task DownloadPlaylistAsync(string playlistUrl)
     {
-        await foreach (var batch in yt.Playlists.GetVideoBatchesAsync(playlistUrl))
+        await VerificarFFmpeg().ConfigureAwait(false);
+        await foreach (var batch in yt.Playlists.GetVideoBatchesAsync(playlistUrl).ConfigureAwait(false))
         {
             foreach (var video in batch.Items)
             {
-                await yt.Videos.DownloadAsync(video.Id, crb.Build());
+                await yt.Videos.DownloadAsync(video.Id, CriarRequisicao($"{TituloLimpo(video.Title)}", "mp4")).ConfigureAwait(false);
             }
         }
+    }
+    public async Task MostrarPlaylistAsync(string playlistUrl)
+    {
+        var playlist = await yt.Playlists.GetAsync(playlistUrl).ConfigureAwait(false);
+        Console.WriteLine($"Playlist: {playlist.Title}");
+        Console.WriteLine($"Autor: {playlist.Author?.ChannelTitle ?? "Desconhecido"}");
+        var contar = 0;
+        await foreach (var video in yt.Playlists.GetVideosAsync(playlistUrl).ConfigureAwait(false))
+        {
+            Console.WriteLine(video.Id);
+            contar++;
+        }
+        Console.WriteLine($"{contar} vídeos encontrados!\n");
     }
     private static Func<IVideoStreamInfo, bool> QualidadeDoVideo(string qualidade)
     {
@@ -49,6 +71,87 @@ public class YoutubeService(YoutubeClient yt, ConversionRequestBuilder crb)
             "144p" => s => s.VideoQuality.Label == "144p",
             _ => throw new ArgumentException("Qualidade de vídeo inválida."),
         };
+    }
+    private async Task<StreamManifest> Manifest(string videoUrl)
+    {
+        return await yt.Videos.Streams.GetManifestAsync(videoUrl).ConfigureAwait(false);
+    }
+    private async Task<IVideoStreamInfo> VideoStream(string videoUrl, string qualidade)
+    {
+        StreamManifest streamManifest = await Manifest(videoUrl).ConfigureAwait(false);
+
+        // Prefere H.264 (avc1) — codec reproduzível no player padrão do Windows.
+        var videoStreamInfo = streamManifest
+            .GetVideoStreams()
+            .Where(s => s.Container == Container.Mp4)
+            .Where(s => s.VideoCodec.StartsWith("avc1", StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(QualidadeDoVideo(qualidade))
+            ?? streamManifest
+                .GetVideoStreams()
+                .Where(s => s.Container == Container.Mp4)
+                .First(QualidadeDoVideo(qualidade));
+        return videoStreamInfo;
+    }
+    private async Task<IAudioStreamInfo> AudioStream(string videoUrl)
+    {
+        StreamManifest streamManifest = await Manifest(videoUrl).ConfigureAwait(false);
+
+        // Prefere AAC (mp4a) — codec reproduzível no player padrão do Windows.
+        var audioMp4 = streamManifest
+            .GetAudioStreams()
+            .Where(s => s.Container == Container.Mp4)
+            .ToList();
+        var audioAac = audioMp4
+            .Where(s => s.AudioCodec.StartsWith("mp4a", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return (IAudioStreamInfo)(audioAac.Count > 0 ? audioAac.GetWithHighestBitrate() : audioMp4.GetWithHighestBitrate());
+    }
+    private static async Task VerificarFFmpeg()
+    {
+        bool ffmpeg = File.Exists(GetFFmpeg());
+        if (!ffmpeg)
+        {
+            // Baixa para AppContext.BaseDirectory, onde o YoutubeExplode.Converter procura o ffmpeg.
+            await FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official, AppContext.BaseDirectory).ConfigureAwait(false);
+        }
+    }
+    private static string GetFFmpeg()
+    {
+        return Directory.EnumerateFiles(AppContext.BaseDirectory ?? Directory.GetCurrentDirectory()).FirstOrDefault(f => string.Equals(Path.GetFileName(f), "ffmpeg.exe", StringComparison.OrdinalIgnoreCase)) ?? "ffmpeg.exe";
+    }
+    private static string SaidaDoArquivo(string nomeArquivo, string extensao)
+    {
+        string caminhoExecutavel = Environment.CurrentDirectory;
+        string caminho = Path.Combine(caminhoExecutavel, $"{TituloLimpo(nomeArquivo)}.{extensao}");
+        return caminho;
+    }
+    private static ConversionRequest CriarRequisicao(string nomeArquivo, string extensao)
+    {
+        var formatado = extensao.ToUpperInvariant();
+        return formatado switch
+        {
+            "MP4" => Builder(nomeArquivo, extensao, Container.Mp4),
+            "MP3" => Builder(nomeArquivo, extensao, Container.Mp3),
+            "WEBM" => Builder(nomeArquivo, extensao, Container.WebM),
+            _ => Builder(nomeArquivo, extensao, Container.Mp4),
+        };
+    }
+    private static ConversionRequest Builder(string nomeArquivo, string extensao, Container container)
+    {
+        var arquivo = SaidaDoArquivo(nomeArquivo, extensao);
+        return new ConversionRequestBuilder(arquivo)
+                            .SetContainer(container)
+                            .SetPreset(ConversionPreset.UltraFast)
+                            .Build();
+    }
+    private static string TituloLimpo(string titulo)
+    {
+        foreach (char c in Path.GetInvalidFileNameChars())
+        {
+            titulo = titulo.Replace(c, '_');
+        }
+        return titulo;
     }
 }
 
