@@ -14,14 +14,14 @@ internal sealed class YoutubeService(YoutubeClient yt)
         var video = await yt.Videos.GetAsync(videoUrl).ConfigureAwait(false);
         IAudioStreamInfo audioStreamInfo = await AudioStream(videoUrl).ConfigureAwait(false);
         string extensao = audioStreamInfo.Container == Container.Mp4 ? "m4a" : audioStreamInfo.Container.Name;
-        var caminho = SaidaDoArquivo($"{TituloLimpo(video.Title)}", extensao);
+        var caminho = SaidaDoArquivo(video.Title, extensao);
         await yt.Videos.Streams.DownloadAsync(audioStreamInfo, caminho).ConfigureAwait(false);
     }
     public async Task DownloadVideoAsync(string videoUrl, string qualidade = "1080p")
     {
         await VerificarFFmpeg().ConfigureAwait(false);
         var video = await yt.Videos.GetAsync(videoUrl).ConfigureAwait(false);
-        var request = CriarRequisicao($"{TituloLimpo(video.Title)}", "mp4");
+        var request = Builder(video.Title);
 
         IAudioStreamInfo audioStreamInfo = await AudioStream(videoUrl).ConfigureAwait(false);
         IVideoStreamInfo videoStreamInfo = await VideoStream(videoUrl, qualidade).ConfigureAwait(false);
@@ -36,7 +36,7 @@ internal sealed class YoutubeService(YoutubeClient yt)
         {
             foreach (var video in batch.Items)
             {
-                await yt.Videos.DownloadAsync(video.Id, CriarRequisicao($"{TituloLimpo(video.Title)}", "mp4")).ConfigureAwait(false);
+                await yt.Videos.DownloadAsync(video.Id, Builder(video.Title)).ConfigureAwait(false);
             }
         }
     }
@@ -53,24 +53,17 @@ internal sealed class YoutubeService(YoutubeClient yt)
         }
         Console.WriteLine($"{contar} vídeos encontrados!\n");
     }
+    private static readonly HashSet<string> QualidadesValidas =
+    [
+        "2160p60", "2160p", "1440p60", "1440p", "1080p60", "1080p",
+        "720p60", "720p", "480p", "360p", "240p", "144p",
+    ];
+
     private static Func<IVideoStreamInfo, bool> QualidadeDoVideo(string qualidade)
     {
-        return qualidade switch
-        {
-            "2160p60" => s => s.VideoQuality.Label == "2160p60",
-            "2160p" => s => s.VideoQuality.Label == "2160p",
-            "1440p60" => s => s.VideoQuality.Label == "1440p60",
-            "1440p" => s => s.VideoQuality.Label == "1440p",
-            "1080p60" => s => s.VideoQuality.Label == "1080p60",
-            "1080p" => s => s.VideoQuality.Label == "1080p",
-            "720p60" => s => s.VideoQuality.Label == "720p60",
-            "720p" => s => s.VideoQuality.Label == "720p",
-            "480p" => s => s.VideoQuality.Label == "480p",
-            "360p" => s => s.VideoQuality.Label == "360p",
-            "240p" => s => s.VideoQuality.Label == "240p",
-            "144p" => s => s.VideoQuality.Label == "144p",
-            _ => throw new ArgumentException("Qualidade de vídeo inválida."),
-        };
+        return !QualidadesValidas.Contains(qualidade)
+            ? throw new ArgumentException("Qualidade de vídeo inválida.")
+            : (s => s.VideoQuality.Label == qualidade);
     }
     private async Task<StreamManifest> Manifest(string videoUrl)
     {
@@ -118,7 +111,7 @@ internal sealed class YoutubeService(YoutubeClient yt)
     }
     private static string GetFFmpeg()
     {
-        return Directory.EnumerateFiles(AppContext.BaseDirectory ?? Directory.GetCurrentDirectory()).FirstOrDefault(f => string.Equals(Path.GetFileName(f), "ffmpeg.exe", StringComparison.OrdinalIgnoreCase)) ?? "ffmpeg.exe";
+        return Directory.EnumerateFiles(AppContext.BaseDirectory).FirstOrDefault(f => string.Equals(Path.GetFileName(f), "ffmpeg.exe", StringComparison.OrdinalIgnoreCase)) ?? "ffmpeg.exe";
     }
     private static string SaidaDoArquivo(string nomeArquivo, string extensao)
     {
@@ -126,23 +119,15 @@ internal sealed class YoutubeService(YoutubeClient yt)
         string caminho = Path.Combine(caminhoExecutavel, $"{TituloLimpo(nomeArquivo)}.{extensao}");
         return caminho;
     }
-    private static ConversionRequest CriarRequisicao(string nomeArquivo, string extensao)
+    private static ConversionRequest Builder(string nomeArquivo)
     {
-        var formatado = extensao.ToUpperInvariant();
-        return formatado switch
-        {
-            "MP4" => Builder(nomeArquivo, extensao, Container.Mp4),
-            "MP3" => Builder(nomeArquivo, extensao, Container.Mp3),
-            "WEBM" => Builder(nomeArquivo, extensao, Container.WebM),
-            _ => Builder(nomeArquivo, extensao, Container.Mp4),
-        };
-    }
-    private static ConversionRequest Builder(string nomeArquivo, string extensao, Container container)
-    {
+        var container = Container.Mp4;
+        var extensao = container.Name;
+        var preset = ConversionPreset.UltraFast;
         var arquivo = SaidaDoArquivo(nomeArquivo, extensao);
         return new ConversionRequestBuilder(arquivo)
                             .SetContainer(container)
-                            .SetPreset(ConversionPreset.UltraFast)
+                            .SetPreset(preset)
                             .Build();
     }
     private static string TituloLimpo(string titulo)
