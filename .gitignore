@@ -12,6 +12,9 @@ Resources/www.youtube.com_cookies.txt
 # Editores
 .vscode/
 
+# Grafo de arquitetura gerado pelo graphify (local, regenerável)
+graphify-out/
+
 # User-specific files
 *.rsuser
 *.suo
