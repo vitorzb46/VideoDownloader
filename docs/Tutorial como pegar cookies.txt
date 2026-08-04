@@ -1,0 +1,7 @@
+Tutorial como pegar cookies!
+
+1. No Google chrome, acesse a Chrome Web Store.
+2. Pesquise e instale a extensão Get cookies.txt LOCALLY.
+3. Abra o site do YouTube e faça login na sua conta.
+4. Clique no ícone de quebra-cabeça (Extensões) no canto superior direito do Vivaldi e selecione a extensão instalada.
+5. Clique em Export. Ela fará o download de um arquivo chamado www.youtube.com_cookies.txt contendo todos os tokens necessários (SID, HSID, SSID, etc.) formatados em texto.
