@@ -58,9 +58,6 @@
   <resheader name="writer">
 	<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Console_PressioneParaContinuar" xml:space="preserve">
-	<value>Pressione qualquer tecla para continuar...</value>
-  </data>
   <data name="Console_Uso" xml:space="preserve">
 	<value>Uso: vdm &lt;comando&gt; [argumentos]
 
@@ -68,6 +65,7 @@ Comandos:
   video &lt;url&gt; [qualidade]   Baixa um vídeo (padrão: 1080p)
   audio &lt;url&gt;               Baixa o áudio
   playlist &lt;url&gt;            Baixa todos os vídeos da playlist
+  mostrar &lt;url&gt;             Lista os vídeos de uma playlist
   help                       Mostra esta ajuda</value>
   </data>
   <data name="Console_UsoVideo" xml:space="preserve">
@@ -78,6 +76,9 @@ Comandos:
   </data>
   <data name="Console_UsoPlaylist" xml:space="preserve">
 	<value>Uso: vdm playlist &lt;url&gt;</value>
+  </data>
+  <data name="Console_UsoMostrar" xml:space="preserve">
+	<value>Uso: vdm mostrar &lt;url&gt;</value>
   </data>
   <data name="Console_ComandoInvalido" xml:space="preserve">
 	<value>Comando desconhecido: '{0}'</value>

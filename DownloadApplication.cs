@@ -28,6 +28,9 @@ internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<Do
                 case "playlist":
                     await BaixarPlaylist(args).ConfigureAwait(false);
                     break;
+                case "mostrar":
+                    await MostrarPlaylist(args).ConfigureAwait(false);
+                    break;
                 case "help" or "-h" or "--help":
                     Console.WriteLine(localizer["Console_Uso"]);
                     break;
@@ -46,54 +49,64 @@ internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<Do
 
     private async Task BaixarVideo(string[] args)
     {
-        if (args.Length < 2)
+        string? url = ObterUrl(args, "Console_UsoVideo");
+        if (url is null)
         {
-            Console.WriteLine(localizer["Console_UsoVideo"]);
-            return;
-        }
-
-        if (!EhUrlValida(args[1]))
-        {
-            Console.WriteLine(localizer["Console_UrlInvalida", args[1]]);
             return;
         }
 
         string qualidade = args.Length >= 3 ? args[2] : "1080p";
-        await ys.DownloadVideoAsync(args[1], qualidade).ConfigureAwait(false);
+        await ys.DownloadVideoAsync(url, qualidade).ConfigureAwait(false);
     }
 
     private async Task BaixarAudio(string[] args)
     {
-        if (args.Length < 2)
+        string? url = ObterUrl(args, "Console_UsoAudio");
+        if (url is null)
         {
-            Console.WriteLine(localizer["Console_UsoAudio"]);
             return;
         }
 
-        if (!EhUrlValida(args[1]))
-        {
-            Console.WriteLine(localizer["Console_UrlInvalida", args[1]]);
-            return;
-        }
-
-        await ys.DownloadAudioAsync(args[1]).ConfigureAwait(false);
+        await ys.DownloadAudioAsync(url).ConfigureAwait(false);
     }
 
     private async Task BaixarPlaylist(string[] args)
     {
+        string? url = ObterUrl(args, "Console_UsoPlaylist");
+        if (url is null)
+        {
+            return;
+        }
+
+        await ys.DownloadPlaylistAsync(url).ConfigureAwait(false);
+    }
+
+    private async Task MostrarPlaylist(string[] args)
+    {
+        string? url = ObterUrl(args, "Console_UsoMostrar");
+        if (url is null)
+        {
+            return;
+        }
+
+        await ys.MostrarPlaylistAsync(url).ConfigureAwait(false);
+    }
+
+    private string? ObterUrl(string[] args, string chaveUso)
+    {
         if (args.Length < 2)
         {
-            Console.WriteLine(localizer["Console_UsoPlaylist"]);
-            return;
+            Console.WriteLine(localizer[chaveUso]);
+            return null;
         }
 
         if (!EhUrlValida(args[1]))
         {
             Console.WriteLine(localizer["Console_UrlInvalida", args[1]]);
-            return;
+            return null;
         }
 
-        await ys.DownloadPlaylistAsync(args[1]).ConfigureAwait(false);
+        return args[1];
     }
 
     private static bool EhUrlValida(string url)
