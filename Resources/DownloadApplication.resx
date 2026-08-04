@@ -82,4 +82,10 @@ Comandos:
   <data name="Console_ComandoInvalido" xml:space="preserve">
 	<value>Comando desconhecido: '{0}'</value>
   </data>
+  <data name="Console_UrlInvalida" xml:space="preserve">
+	<value>URL inválida: '{0}'</value>
+  </data>
+  <data name="Console_Erro" xml:space="preserve">
+	<value>Erro: {0}</value>
+  </data>
 </root>

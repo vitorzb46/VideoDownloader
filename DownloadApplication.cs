@@ -5,34 +5,42 @@ using VideoDownloader.Youtube.Implementation;
 namespace VideoDownloader;
 
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
-internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<DownloadApplication> @string)
+internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<DownloadApplication> localizer)
 {
     public async Task Executar(string[] args)
     {
         if (args.Length == 0)
         {
-            Console.WriteLine(@string["Console_Uso"]);
+            Console.WriteLine(localizer["Console_Uso"]);
             return;
         }
 
-        switch (args[0].ToLowerInvariant())
+        try
         {
-            case "video":
-                await BaixarVideo(args).ConfigureAwait(false);
-                break;
-            case "audio":
-                await BaixarAudio(args).ConfigureAwait(false);
-                break;
-            case "playlist":
-                await BaixarPlaylist(args).ConfigureAwait(false);
-                break;
-            case "help" or "-h" or "--help":
-                Console.WriteLine(@string["Console_Uso"]);
-                break;
-            default:
-                Console.WriteLine(@string["Console_ComandoInvalido", args[0]]);
-                Console.WriteLine(@string["Console_Uso"]);
-                break;
+            switch (args[0].ToLowerInvariant())
+            {
+                case "video":
+                    await BaixarVideo(args).ConfigureAwait(false);
+                    break;
+                case "audio":
+                    await BaixarAudio(args).ConfigureAwait(false);
+                    break;
+                case "playlist":
+                    await BaixarPlaylist(args).ConfigureAwait(false);
+                    break;
+                case "help" or "-h" or "--help":
+                    Console.WriteLine(localizer["Console_Uso"]);
+                    break;
+                default:
+                    Console.WriteLine(localizer["Console_ComandoInvalido", args[0]]);
+                    Console.WriteLine(localizer["Console_Uso"]);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Erros de download ou de rede chegam aqui; exibe mensagem amigável.
+            Console.WriteLine(localizer["Console_Erro", ex.Message]);
         }
     }
 
@@ -40,7 +48,13 @@ internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<Do
     {
         if (args.Length < 2)
         {
-            Console.WriteLine(@string["Console_UsoVideo"]);
+            Console.WriteLine(localizer["Console_UsoVideo"]);
+            return;
+        }
+
+        if (!EhUrlValida(args[1]))
+        {
+            Console.WriteLine(localizer["Console_UrlInvalida", args[1]]);
             return;
         }
 
@@ -52,7 +66,13 @@ internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<Do
     {
         if (args.Length < 2)
         {
-            Console.WriteLine(@string["Console_UsoAudio"]);
+            Console.WriteLine(localizer["Console_UsoAudio"]);
+            return;
+        }
+
+        if (!EhUrlValida(args[1]))
+        {
+            Console.WriteLine(localizer["Console_UrlInvalida", args[1]]);
             return;
         }
 
@@ -63,10 +83,22 @@ internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<Do
     {
         if (args.Length < 2)
         {
-            Console.WriteLine(@string["Console_UsoPlaylist"]);
+            Console.WriteLine(localizer["Console_UsoPlaylist"]);
+            return;
+        }
+
+        if (!EhUrlValida(args[1]))
+        {
+            Console.WriteLine(localizer["Console_UrlInvalida", args[1]]);
             return;
         }
 
         await ys.DownloadPlaylistAsync(args[1]).ConfigureAwait(false);
+    }
+
+    private static bool EhUrlValida(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) &&
+               (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 }
