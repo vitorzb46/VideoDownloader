@@ -1,11 +1,72 @@
+using Microsoft.Extensions.Localization;
+using System.Diagnostics.CodeAnalysis;
 using VideoDownloader.Youtube.Implementation;
 
 namespace VideoDownloader;
 
-public class DownloadApplication(YoutubeService ys)
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
+internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<DownloadApplication> @string)
 {
-    public async Task Executar()
+    public async Task Executar(string[] args)
     {
-        await ys.DownloadVideoAsync("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+        if (args.Length == 0)
+        {
+            Console.WriteLine(@string["Console_Uso"]);
+            return;
+        }
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "video":
+                await BaixarVideo(args).ConfigureAwait(false);
+                break;
+            case "audio":
+                await BaixarAudio(args).ConfigureAwait(false);
+                break;
+            case "playlist":
+                await BaixarPlaylist(args).ConfigureAwait(false);
+                break;
+            case "help" or "-h" or "--help":
+                Console.WriteLine(@string["Console_Uso"]);
+                break;
+            default:
+                Console.WriteLine(@string["Console_ComandoInvalido", args[0]]);
+                Console.WriteLine(@string["Console_Uso"]);
+                break;
+        }
+    }
+
+    private async Task BaixarVideo(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine(@string["Console_UsoVideo"]);
+            return;
+        }
+
+        string qualidade = args.Length >= 3 ? args[2] : "1080p";
+        await ys.DownloadVideoAsync(args[1], qualidade).ConfigureAwait(false);
+    }
+
+    private async Task BaixarAudio(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine(@string["Console_UsoAudio"]);
+            return;
+        }
+
+        await ys.DownloadAudioAsync(args[1]).ConfigureAwait(false);
+    }
+
+    private async Task BaixarPlaylist(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine(@string["Console_UsoPlaylist"]);
+            return;
+        }
+
+        await ys.DownloadPlaylistAsync(args[1]).ConfigureAwait(false);
     }
 }
