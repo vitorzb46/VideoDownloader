@@ -3,10 +3,14 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
-.vscode/
-
 # dotenv files
 .env
+
+# Credenciais locais de sessão (não versionar)
+Resources/www.youtube.com_cookies.txt
+
+# Editores
+.vscode/
 
 # User-specific files
 *.rsuser
@@ -39,8 +43,7 @@ bld/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
-# Uncomment if you have tasks that create the project's static files in wwwroot
-#wwwroot/
+# Uncomment if you have tasks that create the project's static files in wwwroot#wwwroot/
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
