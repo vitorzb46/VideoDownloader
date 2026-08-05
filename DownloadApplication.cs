@@ -5,7 +5,7 @@ using VideoDownloader.Youtube.Implementation;
 namespace VideoDownloader;
 
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
-internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<DownloadApplication> localizer)
+internal sealed class DownloadApplication(YoutubeExplodeService ys, IStringLocalizer<DownloadApplication> localizer)
 {
     public async Task Executar(string[] args)
     {
@@ -17,21 +17,21 @@ internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<Do
 
         try
         {
-            switch (args[0].ToLowerInvariant())
+            switch (args[0].ToUpperInvariant())
             {
-                case "video":
+                case "VIDEO":
                     await BaixarVideo(args).ConfigureAwait(false);
                     break;
-                case "audio":
+                case "AUDIO":
                     await BaixarAudio(args).ConfigureAwait(false);
                     break;
-                case "playlist":
+                case "PLAYLIST":
                     await BaixarPlaylist(args).ConfigureAwait(false);
                     break;
-                case "mostrar":
+                case "MOSTRAR":
                     await MostrarPlaylist(args).ConfigureAwait(false);
                     break;
-                case "help" or "-h" or "--help":
+                case "HELP" or "-H" or "--HELP":
                     Console.WriteLine(localizer["Console_Uso"]);
                     break;
                 default:
@@ -44,6 +44,7 @@ internal sealed class DownloadApplication(YoutubeService ys, IStringLocalizer<Do
         {
             // Erros de download ou de rede chegam aqui; exibe mensagem amigável.
             Console.WriteLine(localizer["Console_Erro", ex.Message]);
+            throw;
         }
     }
 

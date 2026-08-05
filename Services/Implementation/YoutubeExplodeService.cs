@@ -7,7 +7,7 @@ using YoutubeExplode.Videos.Streams;
 namespace VideoDownloader.Youtube.Implementation;
 
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
-internal sealed class YoutubeService(YoutubeClient yt)
+internal sealed class YoutubeExplodeService(YoutubeClient yt)
 {
     public async Task DownloadAudioAsync(string videoUrl)
     {

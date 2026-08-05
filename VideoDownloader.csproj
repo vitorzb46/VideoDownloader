@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.Extensions.Localization" Version="11.0.0-preview.6.26359.118" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
     <PackageReference Include="Xabe.FFmpeg.Downloader" Version="6.0.2" />
+    <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
     <PackageReference Include="YoutubeExplode" Version="6.6.1-a.1" />
     <PackageReference Include="YoutubeExplode.Converter" Version="6.6.1-a.1" />
   </ItemGroup>
