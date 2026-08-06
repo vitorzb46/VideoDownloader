@@ -25,3 +25,6 @@ This repository is integrated with local system skills. Whenever any of the foll
 ## 4. Communication Style
 - Always respond to the user in Portuguese (Brazil).
 - Keep code explanations concise, focusing strictly on the changes made rather than rewriting unchanged boilerplate code.
+
+## 5. Git Commit Process
+- Para commits, apresente o conteúdo da mensagem de commit diretamente no chat para o usuário aprovar antes de executar o git commit.

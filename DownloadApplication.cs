@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Localization;
+using MonoTorrent;
 using System.Diagnostics.CodeAnalysis;
 using VideoDownloader.Services.Implementation;
 using VideoDownloader.Youtube.Implementation;
@@ -6,7 +7,7 @@ using VideoDownloader.Youtube.Implementation;
 namespace VideoDownloader;
 
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
-internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLService ydl, IStringLocalizer<DownloadApplication> localizer)
+internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLService ydl, TorrentDownloadService torrent, IStringLocalizer<DownloadApplication> localizer)
 {
     public async Task Executar(string[] args)
     {
@@ -31,6 +32,9 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
                     break;
                 case "MOSTRAR":
                     await MostrarPlaylist(args).ConfigureAwait(false);
+                    break;
+                case "TORRENT":
+                    await BaixarTorrent(args).ConfigureAwait(false);
                     break;
                 case "HELP" or "-H" or "--HELP":
                     Console.WriteLine(localizer["Console_Uso"]);
@@ -91,6 +95,25 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
         }
 
         //await ys.MostrarPlaylistAsync(url).ConfigureAwait(false);
+    }
+
+    private async Task BaixarTorrent(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine(localizer["Console_UsoTorrent"]);
+            return;
+        }
+
+        if (!MagnetLink.TryParse(args[1], out var magnet))
+        {
+            Console.WriteLine(localizer["Console_MagnetInvalido", args[1]]);
+            return;
+        }
+
+        Console.WriteLine(localizer["Torrent_Iniciado"]);
+        var id = await torrent.BaixarAsync(magnet).ConfigureAwait(false);
+        Console.WriteLine(localizer["Torrent_Concluido", id]);
     }
 
     private string? ObterUrl(string[] args, string chaveUso)

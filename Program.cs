@@ -2,8 +2,6 @@
 using System.Net;
 using VideoDownloader;
 using VideoDownloader.Constantes;
-using VideoDownloader.Services.Implementation;
-using VideoDownloader.Youtube.Implementation;
 using YoutubeDLSharp;
 using YoutubeExplode;
 
@@ -32,6 +30,7 @@ internal sealed class Program
         services.AddSingleton<YoutubeDL>();
         services.AddScoped<VideoDownloader.Youtube.Implementation.YoutubeExplodeService>();
         services.AddScoped<VideoDownloader.Services.Implementation.YoutubeDLService>();
+        services.AddScoped<VideoDownloader.Services.Implementation.TorrentDownloadService>();
 
         services.AddSingleton<AppSettings>();
 
@@ -42,12 +41,12 @@ internal sealed class Program
         var listaCookies = new List<Cookie>();
         var app = Directory.GetCurrentDirectory();
         Directory.CreateDirectory(Path.Combine(app, "Resources"));
-        
+
         string path = Path.Combine(app, "Resources", "www.youtube.com_cookies.txt");
         if (!File.Exists(path))
         {
             File.Create(path).Dispose();
-        }            
+        }
         foreach (var linha in File.ReadAllLines(path))
         {
             if (string.IsNullOrWhiteSpace(linha) || linha.StartsWith('#'))

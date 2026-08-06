@@ -66,6 +66,7 @@ Comandos:
   audio &lt;url&gt;               Baixa o áudio
   playlist &lt;url&gt;            Baixa todos os vídeos da playlist
   mostrar &lt;url&gt;             Lista os vídeos de uma playlist
+  torrent &lt;magnet&gt;          Baixa um torrent via magnet link
   help                       Mostra esta ajuda</value>
   </data>
   <data name="Console_UsoVideo" xml:space="preserve">
@@ -79,6 +80,18 @@ Comandos:
   </data>
   <data name="Console_UsoMostrar" xml:space="preserve">
 	<value>Uso: vdm mostrar &lt;url&gt;</value>
+  </data>
+  <data name="Console_UsoTorrent" xml:space="preserve">
+	<value>Uso: vdm torrent &lt;magnet&gt;</value>
+  </data>
+  <data name="Console_MagnetInvalido" xml:space="preserve">
+	<value>Magnet link inválido: '{0}'</value>
+  </data>
+  <data name="Torrent_Iniciado" xml:space="preserve">
+	<value>Iniciando download do torrent...</value>
+  </data>
+  <data name="Torrent_Concluido" xml:space="preserve">
+	<value>Download do torrent concluído (id: {0}).</value>
   </data>
   <data name="Console_ComandoInvalido" xml:space="preserve">
 	<value>Comando desconhecido: '{0}'</value>
