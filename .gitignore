@@ -3,6 +3,9 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# script bat
+gerar_contexto.bat
+
 # dotenv files
 .env
 
