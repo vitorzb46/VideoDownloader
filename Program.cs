@@ -1,7 +1,10 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using VideoDownloader;
+using VideoDownloader.Constantes;
+using VideoDownloader.Services.Implementation;
 using VideoDownloader.Youtube.Implementation;
+using YoutubeDLSharp;
 using YoutubeExplode;
 
 [assembly: System.Resources.NeutralResourcesLanguage("pt-BR")]
@@ -26,16 +29,26 @@ internal sealed class Program
 
         services.AddTransient<DownloadApplication>();
         services.AddSingleton<YoutubeClient>(provider => new YoutubeClient(ObterCookiesAutenticados()));
-        services.AddScoped<YoutubeExplodeService>();
-        services.AddScoped<YoutubeDLService>();
+        services.AddSingleton<YoutubeDL>();
+        services.AddScoped<VideoDownloader.Youtube.Implementation.YoutubeExplodeService>();
+        services.AddScoped<VideoDownloader.Services.Implementation.YoutubeDLService>();
+
+        services.AddSingleton<AppSettings>();
 
         return services.BuildServiceProvider();
     }
     private static List<Cookie> ObterCookiesAutenticados()
     {
         var listaCookies = new List<Cookie>();
-
-        foreach (var linha in File.ReadAllLines(Path.Combine("Resources", "www.youtube.com_cookies.txt")))
+        var app = Directory.GetCurrentDirectory();
+        Directory.CreateDirectory(Path.Combine(app, "Resources"));
+        
+        string path = Path.Combine(app, "Resources", "www.youtube.com_cookies.txt");
+        if (!File.Exists(path))
+        {
+            File.Create(path).Dispose();
+        }            
+        foreach (var linha in File.ReadAllLines(path))
         {
             if (string.IsNullOrWhiteSpace(linha) || linha.StartsWith('#'))
                 continue;

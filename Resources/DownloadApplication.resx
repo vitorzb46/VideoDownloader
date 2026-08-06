@@ -89,4 +89,7 @@ Comandos:
   <data name="Console_Erro" xml:space="preserve">
 	<value>Erro: {0}</value>
   </data>
+  <data name="Baixando_Video" xml:space="preserve">
+	<value>Baixando vídeo...</value>
+  </data>
 </root>

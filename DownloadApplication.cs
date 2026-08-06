@@ -1,11 +1,12 @@
 using Microsoft.Extensions.Localization;
 using System.Diagnostics.CodeAnalysis;
+using VideoDownloader.Services.Implementation;
 using VideoDownloader.Youtube.Implementation;
 
 namespace VideoDownloader;
 
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
-internal sealed class DownloadApplication(YoutubeExplodeService ys, IStringLocalizer<DownloadApplication> localizer)
+internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLService ydl, IStringLocalizer<DownloadApplication> localizer)
 {
     public async Task Executar(string[] args)
     {
@@ -56,8 +57,18 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, IStringLocal
             return;
         }
 
-        string qualidade = args.Length >= 3 ? args[2] : "1080p";
-        await ys.DownloadVideoAsync(url, qualidade).ConfigureAwait(false);
+        
+        if (url.Contains("youtube", StringComparison.OrdinalIgnoreCase))
+        {
+            string qualidade = args.Length >= 3 ? args[2] : "1080p";
+            await ys.DownloadVideoAsync(url, qualidade).ConfigureAwait(false);
+            return;
+        }
+        else
+        {
+            await ydl.VideoDLAsync(url).ConfigureAwait(false);
+            return;
+        }
     }
 
     private async Task BaixarAudio(string[] args)

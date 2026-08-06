@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using VideoDownloader.Progress;
 using Xabe.FFmpeg.Downloader;
 using YoutubeExplode;
 using YoutubeExplode.Converter;
@@ -9,34 +10,40 @@ namespace VideoDownloader.Youtube.Implementation;
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
 internal sealed class YoutubeExplodeService(YoutubeClient yt)
 {
-    public async Task DownloadAudioAsync(string videoUrl)
+    public async Task DownloadAudioAsync(string videoUrl, IProgress<double>? progress = null)
     {
+        using var progressBar = progress is null ? new ConsoleDownloadProgressBar("YoutubeExplode") : null;
+        var progressReporter = progress ?? progressBar!;
+
         var video = await yt.Videos.GetAsync(videoUrl).ConfigureAwait(false);
         IAudioStreamInfo audioStreamInfo = await AudioStream(videoUrl).ConfigureAwait(false);
         string extensao = audioStreamInfo.Container == Container.Mp4 ? "m4a" : audioStreamInfo.Container.Name;
         var caminho = SaidaDoArquivo(video.Title, extensao);
-        await yt.Videos.Streams.DownloadAsync(audioStreamInfo, caminho).ConfigureAwait(false);
+        await yt.Videos.Streams.DownloadAsync(audioStreamInfo, caminho, progressReporter).ConfigureAwait(false);
     }
-    public async Task DownloadVideoAsync(string videoUrl, string qualidade = "1080p")
+    public async Task DownloadVideoAsync(string videoUrl, string qualidade = "1080p", IProgress<double>? progress = null)
     {
+        using var progressBar = progress is null ? new ConsoleDownloadProgressBar("YoutubeExplode") : null;
+        var progressReporter = progress ?? progressBar!;
+
         await VerificarFFmpeg().ConfigureAwait(false);
         var video = await yt.Videos.GetAsync(videoUrl).ConfigureAwait(false);
         var request = Builder(video.Title);
 
         IAudioStreamInfo audioStreamInfo = await AudioStream(videoUrl).ConfigureAwait(false);
         IVideoStreamInfo videoStreamInfo = await VideoStream(videoUrl, qualidade).ConfigureAwait(false);
-        await yt.Videos.DownloadAsync([audioStreamInfo, videoStreamInfo], request).ConfigureAwait(false);
+        await yt.Videos.DownloadAsync([audioStreamInfo, videoStreamInfo], request, progressReporter).ConfigureAwait(false);
 
         Console.WriteLine($"Qualidade do vídeo: {qualidade}\n");
     }
-    public async Task DownloadPlaylistAsync(string playlistUrl)
+    public async Task DownloadPlaylistAsync(string playlistUrl, IProgress<double>? progress = null)
     {
         await VerificarFFmpeg().ConfigureAwait(false);
         await foreach (var batch in yt.Playlists.GetVideoBatchesAsync(playlistUrl).ConfigureAwait(false))
         {
             foreach (var video in batch.Items)
             {
-                await yt.Videos.DownloadAsync(video.Id, Builder(video.Title)).ConfigureAwait(false);
+                await yt.Videos.DownloadAsync(video.Id, Builder(video.Title), progress).ConfigureAwait(false);
             }
         }
     }
