@@ -24,6 +24,7 @@
   <ItemGroup>
     <EmbeddedResource Update="Resources\DownloadApplication.resx">
       <LogicalName>$(AssemblyName).Resources.$(RootNamespace).DownloadApplication.resources</LogicalName>
+      <Generator></Generator>
     </EmbeddedResource>
   </ItemGroup>
 

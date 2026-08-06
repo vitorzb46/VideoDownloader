@@ -56,19 +56,8 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
         {
             return;
         }
-
-        
-        if (url.Contains("youtube", StringComparison.OrdinalIgnoreCase))
-        {
-            string qualidade = args.Length >= 3 ? args[2] : "1080p";
-            await ys.DownloadVideoAsync(url, qualidade).ConfigureAwait(false);
-            return;
-        }
-        else
-        {
-            await ydl.VideoDLAsync(url).ConfigureAwait(false);
-            return;
-        }
+        await ydl.VideoDLAsync(url).ConfigureAwait(false);
+        return;
     }
 
     private async Task BaixarAudio(string[] args)
@@ -79,7 +68,7 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             return;
         }
 
-        await ys.DownloadAudioAsync(url).ConfigureAwait(false);
+        //await ys.DownloadAudioAsync(url).ConfigureAwait(false);
     }
 
     private async Task BaixarPlaylist(string[] args)
@@ -90,7 +79,7 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             return;
         }
 
-        await ys.DownloadPlaylistAsync(url).ConfigureAwait(false);
+        await ydl.VideoDLAsync(url).ConfigureAwait(false);
     }
 
     private async Task MostrarPlaylist(string[] args)
@@ -101,7 +90,7 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             return;
         }
 
-        await ys.MostrarPlaylistAsync(url).ConfigureAwait(false);
+        //await ys.MostrarPlaylistAsync(url).ConfigureAwait(false);
     }
 
     private string? ObterUrl(string[] args, string chaveUso)
