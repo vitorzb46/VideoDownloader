@@ -6,6 +6,9 @@
 # script bat
 gerar_contexto.bat
 
+# Documento de plano (local, avaliação)
+docs/plano-torrent-service.md
+
 # dotenv files
 .env
 

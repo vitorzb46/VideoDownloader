@@ -9,4 +9,13 @@ internal sealed class AppSettings
     public string? YtDlpExe = "yt-dlp.exe";
     public string? FfmpegExe = "ffmpeg.exe";
     public string? Cookies = string.Empty;
+
+    // Torrent (MonoTorrent)
+    public string? PastaDownloads = "Downloads";
+    public int TorrentPorta = 51413;
+    public bool TorrentSemear = false;
+    public bool TorrentStreaming = false;
+    public long? TorrentLimiteDownload = null;
+    public long? TorrentLimiteUpload = null;
+    public string[] TorrentTrackers = [];
 }
