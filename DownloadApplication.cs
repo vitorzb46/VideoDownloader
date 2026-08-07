@@ -11,6 +11,9 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
 {
     public async Task Executar(string[] args)
     {
+#if DEBUG
+        args = ["torrent", "magnet:?xt=urn:btih:212488687F9CBDFD74CEDBA7A43EEB91FE82C271&dn=%5Bbitsearch.to%5D%20Silo.S03E04.1080p.HEVC.x265-MeGusta%5BEZTVx.to%5D.mkv&tr=DHT&tr=udp%3A%2F%2Fbittorrent-tracker.e-n-c-r-y-p-t.net%3A1337%2Fannounce&tr=udp%3A%2F%2Fevan.im%3A6969%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce"];
+#endif
         if (args.Length == 0)
         {
             Console.WriteLine(localizer["Console_Uso"]);
@@ -110,9 +113,13 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             Console.WriteLine(localizer["Console_MagnetInvalido", args[1]]);
             return;
         }
-        Console.WriteLine(localizer["Torrent_Iniciado"]);
-        var id = await torrent.BaixarAsync(args[1]).ConfigureAwait(false);
-        Console.WriteLine(localizer["Torrent_Concluido", id]);
+        else
+        {
+            Console.WriteLine(localizer["Torrent_Iniciado"]);
+            var id = await torrent.BaixarAsync(magnet).ConfigureAwait(false);
+            Console.WriteLine(localizer["Torrent_Concluido", id]);
+        }
+
     }
 
     private string? ObterUrl(string[] args, string chaveUso)

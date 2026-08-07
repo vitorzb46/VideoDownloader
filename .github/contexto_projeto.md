@@ -14,12 +14,13 @@
 ### Arquivo: DownloadApplication.cs 
 ```csharp 
 namespace VideoDownloader;
-internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLService ydl, IStringLocalizer<DownloadApplication> localizer)
+internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLService ydl, TorrentDownloadService torrent, IStringLocalizer<DownloadApplication> localizer)
     public async Task Executar(string[] args)
     private async Task BaixarVideo(string[] args)
     private async Task BaixarAudio(string[] args)
     private async Task BaixarPlaylist(string[] args)
     private async Task MostrarPlaylist(string[] args)
+    private async Task BaixarTorrent(string[] args)
     private string? ObterUrl(string[] args, string chaveUso)
     private static bool EhUrlValida(string url)
 ``` 
@@ -43,6 +44,13 @@ internal sealed class AppSettings
     public string? YtDlpExe = "yt-dlp.exe";
     public string? FfmpegExe = "ffmpeg.exe";
     public string? Cookies = string.Empty;
+    public string? PastaDownloads = "Downloads";
+    public int TorrentPorta = 51413;
+    public bool TorrentSemear = false;
+    public bool TorrentStreaming = false;
+    public long? TorrentLimiteDownload = null;
+    public long? TorrentLimiteUpload = null;
+    public string[] TorrentTrackers = [];
 ``` 
  
 ### Arquivo: ConsoleDownloadProgressBar.cs 
@@ -84,9 +92,20 @@ namespace VideoDownloader.Resources {
         public static string Console_UsoVideo {
 ``` 
  
+### Arquivo: TorrentProgress.cs 
+```csharp 
+namespace VideoDownloader.Services;
+internal enum TorrentEstado
+internal sealed record TorrentProgress(
+``` 
+ 
 ### Arquivo: TorrentDownloadService.cs 
 ```csharp 
-internal sealed class TorrentDownloadService
+namespace VideoDownloader.Services.Implementation;
+internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings appContext)
+    private readonly AppSettings AppContext = appContext;
+    private ClientEngine Engine { get; } = engine;
+    public async Task<Guid> BaixarAsync(MagnetLink magnet, CancellationToken? token = default)
 ``` 
  
 ### Arquivo: YoutubeDLService.cs 
@@ -114,36 +133,41 @@ internal sealed class YoutubeExplodeService(YoutubeClient yt)
 ``` 
  
 ## Análise de Dependências (Graphify) 
-# Graph Report - C:\Users\Vitor\Documents\Repos\Projects\VideoDownloader  (2026-08-06)
+# Graph Report - C:\Users\Vitor\Documents\Repos\Projects\VideoDownloader  (2026-08-07)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 99 nodes · 121 edges · 24 communities (7 shown, 17 thin omitted)
+- 112 nodes · 135 edges · 29 communities (9 shown, 20 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `61b779ea`
+- Built from commit: `cacfd5be`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - YoutubeDLService
 - ConsoleDownloadProgressBar
-- Program.cs
 - VideoDownloader.csproj
 - DownloadApplication
+- VideoDownloader.Services.Implementation
 - Program
+- .BaixarAsync
 - DownloadApplication
+- TorrentProgress.cs
+- YoutubeExplodeService.cs
+- string
 - Container
 - ConversionRequest
-- Cookie
 - Func
 - IAudioStreamInfo
 - IReadOnlyList
 - IVideoStreamInfo
+- Cookie
+- List
 - Cookie
 - HashSet
 - IProgress
@@ -157,59 +181,69 @@ internal sealed class YoutubeExplodeService(YoutubeClient yt)
 ## God Nodes (most connected - your core abstractions)
 1. `YoutubeDLService` - 13 edges
 2. `ConsoleDownloadProgressBar` - 10 edges
-3. `DownloadApplication` - 8 edges
-4. `Program` - 4 edges
+3. `DownloadApplication` - 9 edges
+4. `AppSettings` - 6 edges
 5. `YoutubeDlProgressBridge` - 4 edges
-6. `VideoDownloader.Services.Implementation` - 4 edges
-7. `DownloadApplication` - 3 edges
-8. `VideoDownloader.Youtube.Implementation` - 3 edges
-9. `VideoDownloader.Constantes` - 2 edges
-10. `AppSettings` - 2 edges
+6. `Program` - 4 edges
+7. `TorrentDownloadService` - 4 edges
+8. `DownloadApplication` - 3 edges
+9. `VideoDownloader.Constantes` - 3 edges
+10. `VideoDownloader.Services.Implementation` - 3 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `ConsoleDownloadProgressBar` --implements--> `IProgress`  [EXTRACTED]
-  Progress/ConsoleDownloadProgressBar.cs →   _Bridges community 1 → community 0_
+- `TorrentDownloadService` --references--> `AppSettings`  [EXTRACTED]
+  Services/Implementation/TorrentDownloadService.cs → Constantes/AppSettings.cs
 
 ## Import Cycles
 - None detected.
 
-## Communities (24 total, 17 thin omitted)
+## Communities (29 total, 20 thin omitted)
 
 ### Community 0 - "YoutubeDLService"
-Cohesion: 0.19
-Nodes (9): GeneratedRegex, HttpResponseMessage, IEnumerable, IProgress, List, Regex, Task, YoutubeDLService (+1 more)
+Cohesion: 0.21
+Nodes (8): GeneratedRegex, HttpResponseMessage, IEnumerable, IProgress, Regex, Task, YoutubeDLService, Uri
 
 ### Community 1 - "ConsoleDownloadProgressBar"
-Cohesion: 0.18
-Nodes (9): bool, VideoDownloader.Progress, DownloadProgress, IDisposable, int, object, string, ConsoleDownloadProgressBar (+1 more)
+Cohesion: 0.15
+Nodes (12): bool, AppSettings, VideoDownloader.Progress, DownloadProgress, IDisposable, int, long, object (+4 more)
 
-### Community 2 - "Program.cs"
-Cohesion: 0.16
-Nodes (8): string, AppSettings, VideoDownloader, VideoDownloader.Services.Implementation, VideoDownloader.Constantes, VideoDownloader.Youtube.Implementation, TorrentDownloadService, YoutubeExplodeService
-
-### Community 3 - "VideoDownloader.csproj"
+### Community 2 - "VideoDownloader.csproj"
 Cohesion: 0.18
 Nodes (10): net10.0, Microsoft.Extensions.DependencyInjection (11.0.0-preview.6.26359.118), Microsoft.Extensions.Localization (11.0.0-preview.6.26359.118), Microsoft.Extensions.Logging (10.0.10), MonoTorrent (3.0.2), Xabe.FFmpeg.Downloader (6.0.2), YoutubeDLSharp (1.2.0), YoutubeExplode (6.6.1-a.1) (+2 more)
+
+### Community 4 - "VideoDownloader.Services.Implementation"
+Cohesion: 0.29
+Nodes (3): VideoDownloader, VideoDownloader.Services.Implementation, VideoDownloader.Constantes
 
 ### Community 5 - "Program"
 Cohesion: 0.32
 Nodes (5): Cookie, List, Task, Program, ServiceProvider
 
-### Community 6 - "DownloadApplication"
+### Community 6 - ".BaixarAsync"
+Cohesion: 0.29
+Nodes (6): CancellationToken, ClientEngine, Guid, MagnetLink, Task, TorrentDownloadService
+
+### Community 7 - "DownloadApplication"
 Cohesion: 0.40
 Nodes (4): VideoDownloader.Resources, CultureInfo, ResourceManager, DownloadApplication
 
+### Community 8 - "TorrentProgress.cs"
+Cohesion: 0.50
+Nodes (3): VideoDownloader.Services, TorrentEstado, TorrentProgress
+
 ## Knowledge Gaps
-- **14 isolated node(s):** `VideoDownloader.Progress`, `VideoDownloader.Resources`, `YoutubeExplodeService`, `net10.0`, `Microsoft.Extensions.DependencyInjection (11.0.0-preview.6.26359.118)` (+9 more)
+- **17 isolated node(s):** `VideoDownloader.Progress`, `VideoDownloader.Resources`, `VideoDownloader.Youtube.Implementation`, `YoutubeExplodeService`, `net10.0` (+12 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **20 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `YoutubeDLService` connect `YoutubeDLService` to `Program.cs`?**
-  _High betweenness centrality (0.246) - this node is a cross-community bridge._
+- **Why does `YoutubeDLService` connect `YoutubeDLService` to `VideoDownloader.Services.Implementation`?**
+  _High betweenness centrality (0.125) - this node is a cross-community bridge._
 - **Why does `ConsoleDownloadProgressBar` connect `ConsoleDownloadProgressBar` to `YoutubeDLService`?**
-  _High betweenness centrality (0.112) - this node is a cross-community bridge._
-- **What connects `VideoDownloader.Progress`, `VideoDownloader.Resources`, `YoutubeExplodeService` to the rest of the system?**
-  _14 weakly-connected nodes found - possible documentation gaps or missing edges._ 
+  _High betweenness centrality (0.110) - this node is a cross-community bridge._
+- **What connects `VideoDownloader.Progress`, `VideoDownloader.Resources`, `VideoDownloader.Youtube.Implementation` to the rest of the system?**
+  _17 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `ConsoleDownloadProgressBar` be split into smaller, more focused modules?**
+  _Cohesion score 0.14705882352941177 - nodes in this community are weakly interconnected._ 
