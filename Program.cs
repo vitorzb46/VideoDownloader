@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using MonoTorrent.Client;
 using System.Net;
 using VideoDownloader;
 using VideoDownloader.Constantes;
@@ -28,6 +29,7 @@ internal sealed class Program
         services.AddTransient<DownloadApplication>();
         services.AddSingleton<YoutubeClient>(provider => new YoutubeClient(ObterCookiesAutenticados()));
         services.AddSingleton<YoutubeDL>();
+        services.AddSingleton<TorrentManager>();
         services.AddScoped<VideoDownloader.Youtube.Implementation.YoutubeExplodeService>();
         services.AddScoped<VideoDownloader.Services.Implementation.YoutubeDLService>();
         services.AddScoped<VideoDownloader.Services.Implementation.TorrentDownloadService>();

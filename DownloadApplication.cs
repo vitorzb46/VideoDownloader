@@ -110,9 +110,8 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             Console.WriteLine(localizer["Console_MagnetInvalido", args[1]]);
             return;
         }
-
         Console.WriteLine(localizer["Torrent_Iniciado"]);
-        var id = await torrent.BaixarAsync(magnet).ConfigureAwait(false);
+        var id = await torrent.BaixarAsync(args[1]).ConfigureAwait(false);
         Console.WriteLine(localizer["Torrent_Concluido", id]);
     }
 
