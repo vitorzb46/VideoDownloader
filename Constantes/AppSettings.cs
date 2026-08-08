@@ -12,10 +12,12 @@ internal sealed class AppSettings
 
     // Torrent (MonoTorrent)
     public string? PastaDownloads = "Downloads";
+    public string? PastaTorrents = "Torrents";
+    public string? PastaCache = "Cache";
     public int TorrentPorta = 51413;
-    public bool TorrentSemear = false;
-    public bool TorrentStreaming = false;
-    public long? TorrentLimiteDownload = null;
-    public long? TorrentLimiteUpload = null;
+    public bool TorrentSemear;
+    public bool TorrentStreaming;
+    public long? TorrentLimiteDownload;
+    public long? TorrentLimiteUpload;
     public string[] TorrentTrackers = [];
 }

@@ -1,9 +1,8 @@
 using System.Globalization;
 using System.Text;
-using MonoTorrent.Client;
-using YoutubeDLSharp;
 
 namespace VideoDownloader.Progress;
+
 internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposable
 {
     private readonly string _title;
@@ -19,16 +18,15 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
         _title = string.IsNullOrWhiteSpace(title) ? "Download" : title.Trim();
         _width = Math.Max(10, width);
     }
+    // Satisfaz a interface IProgress
     public void Report(double value)
     {
-        Report(value, null); 
+        Report(value, null);
     }
+
     public void Report(double value, StringBuilder? sb)
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         var percentage = Math.Clamp(value, 0d, 1d) * 100d;
         var rounded = (int)Math.Round(percentage);
@@ -38,23 +36,25 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
             if (sb == null)
             {
                 if (rounded == _lastPercent) return;
-                
+
                 _lastPercent = rounded;
                 Render(rounded, null);
-                return; 
+                return;
             }
+
+            if (rounded == _lastPercent) return;
 
             _lastPercent = rounded;
             Render(rounded, sb);
         }
     }
-    public void Report(TorrentManager value) => Report(value);
     private void Render(int percentage, StringBuilder? sb)
     {
         var preenchido = (int)Math.Round(_width * (percentage / 100d));
         var vazio = _width - preenchido;
-        
-        if (sb == null){
+
+        if (sb == null)
+        {
 
             Console.Write($"\r{_title}: [{new string('=', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
 
@@ -63,7 +63,8 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
                 Console.WriteLine();
             }
             return;
-        }else
+        }
+        else
         {
             sb.Append(CultureInfo.InvariantCulture, $" {_title}: [{new string('=', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
 
@@ -82,21 +83,5 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
 
         _disposed = true;
         // Report(1d);
-    }
-}
-
-internal sealed class YoutubeDlProgressBridge : IProgress<DownloadProgress>
-{
-    private readonly IProgress<double> _progress;
-
-    public YoutubeDlProgressBridge(IProgress<double> progress)
-    {
-        _progress = progress ?? throw new ArgumentNullException(nameof(progress));
-    }
-
-    public void Report(DownloadProgress value)
-    {
-        ArgumentNullException.ThrowIfNull(value);
-        _progress.Report(value.Progress);
     }
 }

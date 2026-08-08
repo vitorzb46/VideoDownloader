@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Localization;
 using MonoTorrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using VideoDownloader.Services.Implementation;
 using VideoDownloader.Youtube.Implementation;
@@ -11,9 +12,11 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
 {
     public async Task Executar(string[] args)
     {
-#if DEBUG
-        args = ["torrent", "magnet:?xt=urn:btih:212488687F9CBDFD74CEDBA7A43EEB91FE82C271&dn=Silo+S03E04+1080p+HEVC+x265-MeGusta&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.dler.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.ololosh.space%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.dump.cl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.bittor.pw%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker-udp.gbitt.info%3A80%2Fannounce&tr=udp%3A%2F%2Fretracker01-msk-virt.corbina.net%3A80%2Fannounce&tr=udp%3A%2F%2Fopen.free-tracker.ga%3A6969%2Fannounce&tr=udp%3A%2F%2Fns-1.x-fins.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fleet-tracker.moe%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.open-internet.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.pirateparty.gr%3A6969%2Fannounce&tr=udp%3A%2F%2Fdenis.stalker.upeer.me%3A6969%2Fannounce"];
-#endif
+        if (Debugger.IsAttached)
+        {
+            args = ["torrent", "Torrents"];
+        }
+
         if (args.Length == 0)
         {
             Console.WriteLine(localizer["Console_Uso"]);
@@ -108,18 +111,33 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             return;
         }
 
-        if (!MagnetLink.TryParse(args[1], out var magnet))
+        string input = args[1];
+        Guid? id = null;
+
+        if (MagnetLink.TryParse(input, out var magnet))
         {
-            Console.WriteLine(localizer["Console_MagnetInvalido", args[1]]);
-            return;
+            Console.WriteLine(localizer["Torrent_Iniciado"]);
+
+            id = await torrent.BaixarAsync(magnet).ConfigureAwait(false);
+
+            Console.WriteLine(localizer["Torrent_Concluido", id]);
         }
         else
         {
-            Console.WriteLine(localizer["Torrent_Iniciado"]);
-            var id = await torrent.BaixarAsync(magnet).ConfigureAwait(false);
-            Console.WriteLine(localizer["Torrent_Concluido", id]);
-        }
+            try
+            {
+                Console.WriteLine(localizer["Torrent_Iniciado"]);
 
+                id = await torrent.BaixarAsync(input).ConfigureAwait(false);
+
+                Console.WriteLine(localizer["Torrent_Concluido", id]);
+            }
+            catch
+            {
+                Console.WriteLine(localizer["Console_TorrentInvalido", input]);
+                return;
+            }
+        }
     }
 
     private string? ObterUrl(string[] args, string chaveUso)
