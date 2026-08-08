@@ -19,7 +19,7 @@ internal sealed partial class YoutubeDLService(AppSettings appContext)
         var pastaRecursos = appContext.PastaRecursos ?? "Resources";
 
         Directory.CreateDirectory(Path.Combine(app, pastaRecursos));
-        using var progressBar = progress is null ? new ConsoleDownloadProgressBar("Baixa mídia") : null;
+        using var progressBar = progress is null ? new ConsoleDownloadProgressBar("Baixando mídia") : null;
         var progressReporter = progress ?? progressBar!;
 
         if (await MidiaDiretaAsync(videoUrl).ConfigureAwait(false) && !SiteComExtractor(videoUrl))

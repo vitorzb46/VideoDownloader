@@ -1,8 +1,10 @@
 ﻿using MonoTorrent;
 using MonoTorrent.Client;
 using MonoTorrent.Trackers;
+using System.Globalization;
 using System.Text;
 using VideoDownloader.Constantes;
+using VideoDownloader.Progress;
 
 namespace VideoDownloader.Services.Implementation;
 
@@ -11,7 +13,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
     private readonly AppSettings AppContext = appContext;
     private ClientEngine Engine { get; } = engine;
 
-    public async Task<Guid> BaixarAsync(MagnetLink magnet, CancellationToken? token = default)
+    public async Task<Guid> BaixarAsync(MagnetLink magnet, CancellationToken? token = default, IProgress<double>? progress = null)
     {
         var id = Guid.NewGuid();
 
@@ -19,6 +21,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         Directory.CreateDirectory(Path.Combine(app, AppContext.PastaDownloads!));
         Directory.CreateDirectory(Path.Combine(app, "cache"));
         var pastaDownload = Path.Combine(app, AppContext.PastaDownloads!);
+        
         try
         {
             var torrentSetings = new TorrentSettings();
@@ -48,66 +51,82 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 };
                 await manager.StartAsync().ConfigureAwait(false);
             }
-
-            Console.Clear(); // Limpa apenas uma vez antes do loop começar
+            
             Console.CursorVisible = false;
-            int count = 0;
             StringBuilder sb = new(1024);
             while (Engine.IsRunning)
             {
                 Console.SetCursorPosition(0, 0);
+                Console.Clear();
+
                 sb.Remove(0, sb.Length);
                 foreach (TorrentManager manager in Engine.Torrents)
                 {
                     double progresso = manager.Progress;
+
+                    if (manager.State == TorrentState.Seeding)
+                    {
+                        progresso = 100.0;
+                    }                    
 
                     long bytesRestantes = Engine.TotalDownloadRate - manager.Monitor.DataBytesReceived;
                     double velocidade = manager.Monitor.DownloadRate;
                     double etaSegundos = velocidade > 0 ? bytesRestantes / velocidade : double.PositiveInfinity;
 
                     string etaTexto;
-                    if (manager.State == TorrentState.Seeding || progresso >= 100)
+                    if (manager.State == TorrentState.Seeding || progresso >= 100.0)
                     {
-                        etaTexto = "Concluído";
+                        etaTexto = "Concluído ";
                     }
                     else if (double.IsPositiveInfinity(etaSegundos))
                     {
-                        etaTexto = "Parado";
+                        etaTexto = "Parado ";
                     }
                     else
                     {
                         TimeSpan etaTimeSpan = TimeSpan.FromSeconds(etaSegundos);
                         etaTexto = etaTimeSpan.Days > 0
-                            ? etaTimeSpan.ToString(@"d\.hh\:mm\:ss")
-                            : etaTimeSpan.ToString(@"hh\:mm\:ss");
+                            ? etaTimeSpan.ToString(@"d\.hh\:mm\:ss", CultureInfo.CurrentCulture)
+                            : etaTimeSpan.ToString(@"hh\:mm\:ss", CultureInfo.CurrentCulture);
+                    }
+                    AppendSeparator(sb);
+                    AppendFormat(sb, $"                             PROGRESSO DO DOWNLOAD");
+                    AppendSeparator(sb);
+                    AppendFormat(sb, $" Nome:                       {(manager.Torrent == null ? "Meta Data" : manager.Torrent.Name)}");
+                    AppendFormat(sb, $" Status:                     {manager.State}");
+                    
+                    if (progress is null)
+                    {
+                        using (var temp = new ConsoleDownloadProgressBar("Progresso:                  "))
+                        {
+                            double valorNormalizado = progresso / 100d;
+                            temp.Report(valorNormalizado, sb);
+                        }
+                        sb.AppendLine();
+                    }else if (progress is ConsoleDownloadProgressBar consoleBar){
+                        double valorNormalizado = progresso / 100d;
+                        consoleBar.Report(valorNormalizado, sb);
+                        sb.AppendLine();
                     }
 
-                    AppendSeparator(sb);
-                    AppendFormat(sb, $" PROGRESSO DO DOWNLOAD");
-                    AppendSeparator(sb);
-                    AppendFormat(sb, $" Nome:                  {(manager.Torrent == null ? "MetaDataMode" : manager.Torrent.Name)}");
-                    AppendFormat(sb, $" Status:                {manager.State}");
-                    AppendFormat(sb, $" Progresso:             [{progresso}] {progresso:0.00}%");
+                    // AppendFormat(sb, $" Progresso:                  [{progresso}] {progresso:0.00}%");
                     AppendFormat(sb, "");
-                    AppendFormat(sb, $" Velocidade de Download: {Engine.TotalDownloadRate / 1048576.0:0.00} MB/s ↓");
-                    AppendFormat(sb, $" Velocidade de Upload:   {Engine.TotalUploadRate / 1048576.0:0.00} MB/s ↑");
-                    AppendFormat(sb, $" Tempo Restante (ETA):   {etaTexto}");
-                    AppendFormat(sb, $" Conexões Ativas:        {manager.Peers.Seeds} seeds conectados de {manager.Peers.Available} disponíveis");
+                    AppendFormat(sb, $" Velocidade Download/Upload: {Engine.TotalDownloadRate / 1048576.0:0.00} MB/s ↓ -- {Engine.TotalUploadRate / 1048576.0:0.00} MB/s ↑");
+                    AppendFormat(sb, $" Tempo Restante (ETA):       {etaTexto}");
+                    AppendFormat(sb, $" Conexões Ativas:            {manager.Peers.Seeds} seeds conectados de {manager.Peers.Available} disponíveis");
                     AppendSeparator(sb);
 
                     AppendFormat(sb, $" Rastreamento (Tracker):  ({manager.TrackerManager.Tiers.Count} grupos ativos)");
                     AppendSeparator(sb);
 
-                    // 2. Loop corrigido para listar cada tracker com base no seu TrackerState
                     AppendFormat(sb, $" LISTA DE RASTREADORES:");
                     foreach (var tier in manager.TrackerManager.Tiers)
                     {
                         foreach (var tracker in tier.Trackers)
                         {
-                            // Define o ícone de acordo com o status real do enum TrackerState do MonoTorrent
                             string sinal = tracker.Status switch
                             {
-                                TrackerState.Ok => "✔",
+                                TrackerState.Ok => "✅",
                                 TrackerState.Offline => "❌",
                                 TrackerState.Connecting => "⏳",
                                 _ => "⏳" // Para estados como Unknown ou invalidados
@@ -115,11 +134,10 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
                             AppendFormat(sb, $"   {sinal} {tracker.Uri}");
                         }
-                    }
-                    count++;
+                    }                    
                 }
-                Console.WriteLine(sb.ToString());
-
+                
+                Console.WriteLine(sb.ToString());                
                 await Task.Delay(5000).ConfigureAwait(false);
             }
         }
@@ -128,13 +146,13 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             Console.WriteLine($"Erro ao baixar torrent: {ex.Message}");
             throw;
         }
-
+        
         return id;
     }
     private static void AppendSeparator(StringBuilder sb)
     {
         AppendFormat(sb, "");
-        AppendFormat(sb, "======================================================================");
+        AppendFormat(sb, "============================================================================================");
         AppendFormat(sb, "");
     }
     private static void AppendFormat(StringBuilder sb, string str, params object[] formatting)

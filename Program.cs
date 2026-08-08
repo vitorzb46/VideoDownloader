@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using MonoTorrent.Client;
 using System.Net;
+using System.Text;
 using VideoDownloader;
 using VideoDownloader.Constantes;
 using YoutubeDLSharp;
@@ -11,7 +12,10 @@ internal sealed class Program
 {
     private static async Task Main(string[] args)
     {
+        Console.OutputEncoding = Encoding.UTF8;
+
         // System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo("en-US");
+        
         var serviceProvider = ConfigureServices();
 
         var app = serviceProvider.GetRequiredService<DownloadApplication>();

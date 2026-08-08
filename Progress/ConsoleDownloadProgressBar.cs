@@ -1,7 +1,9 @@
+using System.Globalization;
+using System.Text;
+using MonoTorrent.Client;
 using YoutubeDLSharp;
 
 namespace VideoDownloader.Progress;
-
 internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposable
 {
     private readonly string _title;
@@ -9,14 +11,19 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
     private readonly object _sync = new();
     private int _lastPercent = -1;
     private bool _disposed;
-
-    public ConsoleDownloadProgressBar(string title = "Download", int width = 40)
+    /// <summary>
+    /// Classe responsável por renderizar o progresso de download no console.
+    /// </summary>
+    public ConsoleDownloadProgressBar(string title = "Download", int width = 30)
     {
         _title = string.IsNullOrWhiteSpace(title) ? "Download" : title.Trim();
         _width = Math.Max(10, width);
     }
-
     public void Report(double value)
+    {
+        Report(value, null); 
+    }
+    public void Report(double value, StringBuilder? sb)
     {
         if (_disposed)
         {
@@ -28,28 +35,44 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
 
         lock (_sync)
         {
-            if (rounded == _lastPercent)
+            if (sb == null)
             {
-                return;
+                if (rounded == _lastPercent) return;
+                
+                _lastPercent = rounded;
+                Render(rounded, null);
+                return; 
             }
 
             _lastPercent = rounded;
-            Render(rounded);
+            Render(rounded, sb);
         }
     }
-
-    private void Render(int percentage)
+    public void Report(TorrentManager value) => Report(value);
+    private void Render(int percentage, StringBuilder? sb)
     {
         var preenchido = (int)Math.Round(_width * (percentage / 100d));
         var vazio = _width - preenchido;
-        Console.Write($"\r{_title}: [{new string('=', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
+        
+        if (sb == null){
 
-        if (percentage >= 100)
+            Console.Write($"\r{_title}: [{new string('=', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
+
+            if (percentage >= 100)
+            {
+                Console.WriteLine();
+            }
+            return;
+        }else
         {
-            Console.WriteLine();
+            sb.Append(CultureInfo.InvariantCulture, $" {_title}: [{new string('=', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
+
+            if (percentage >= 100)
+            {
+                sb.AppendLine();
+            }
         }
     }
-
     public void Dispose()
     {
         if (_disposed)
@@ -58,7 +81,7 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
         }
 
         _disposed = true;
-        Report(1d);
+        // Report(1d);
     }
 }
 
