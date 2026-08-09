@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -8,6 +9,7 @@ using YoutubeDLSharp;
 
 namespace VideoDownloader.Services.Implementation;
 
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
 internal sealed partial class YoutubeDLService(AppSettings appContext)
 {
     [GeneratedRegex(@"\b(?<percent>\d{1,3}(?:\.\d+)?)%")]

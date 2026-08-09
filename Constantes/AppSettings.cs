@@ -1,5 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace VideoDownloader.Constantes;
 
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
 internal sealed class AppSettings
 {
     public string? NomeArquivo = "%(title)s.%(ext)s";
@@ -15,9 +18,14 @@ internal sealed class AppSettings
     public string? PastaTorrents = "Torrents";
     public string? PastaCache = "Cache";
     public int TorrentPorta = 51413;
-    public bool TorrentSemear;
-    public bool TorrentStreaming;
-    public long? TorrentLimiteDownload;
-    public long? TorrentLimiteUpload;
+    public int ConnectionsMaxima = 150;
+    public int UploadSlotsMaximo = 4;
+    // Limites em bytes/s; 0 = ilimitado. Campos mantêm o default (0) até serem configurados.
+#pragma warning disable CS0649
+    public int TorrentLimiteDownload;
+    public int TorrentLimiteUpload;
+#pragma warning restore CS0649
+    public bool TorrentSemear = true;
+    public bool TorrentStreaming = true;
     public string[] TorrentTrackers = [];
 }

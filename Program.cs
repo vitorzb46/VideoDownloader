@@ -34,7 +34,6 @@ internal sealed class Program
         services.AddTransient<DownloadApplication>();
         services.AddSingleton<YoutubeClient>(provider => new YoutubeClient(ObterCookiesAutenticados()));
         services.AddSingleton<YoutubeDL>();
-        services.AddSingleton<TorrentManager>();
         services.AddSingleton<ClientEngine>();
         services.AddScoped<VideoDownloader.Youtube.Implementation.YoutubeExplodeService>();
         services.AddScoped<VideoDownloader.Services.Implementation.YoutubeDLService>();

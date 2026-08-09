@@ -6,6 +6,11 @@ namespace VideoDownloader.Youtube.Implementation;
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
 internal sealed class YoutubeExplodeService(YoutubeClient yt)
 {
+    // Classe descontinuada em favor do YoutubeDLService. O parâmetro fica reservado para reativação futura.
+#pragma warning disable CS9113, CA1823
+    private readonly YoutubeClient _yt = yt;
+#pragma warning restore CS9113, CA1823
+
     // Como a classe YoutubeDLService implementa a mesma funcionalidade, a classe YoutubeExplodeService foi descontinuada
     //public async Task DownloadAudioAsync(string videoUrl, IProgress<double>? progress = null)
     //{
