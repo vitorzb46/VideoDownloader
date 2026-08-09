@@ -11,7 +11,7 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
     private int _lastPercent = -1;
     private bool _disposed;
     /// <summary>
-    /// Classe responsável por renderizar o progresso de download no console.
+    /// Classe responsável por renderizar a barra de progresso de download no console.
     /// </summary>
     public ConsoleDownloadProgressBar(string title = "Download", int width = 30)
     {
@@ -56,7 +56,7 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
         if (sb == null)
         {
 
-            Console.Write($"\r{_title}: [{new string('=', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
+            Console.Write($"\r{_title}: [{new string('■', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
 
             if (percentage >= 100)
             {

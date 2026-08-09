@@ -21,6 +21,7 @@ internal sealed class Program
         var app = serviceProvider.GetRequiredService<DownloadApplication>();
 
         await app.Executar(args).ConfigureAwait(false);
+        Console.ReadKey(true);
     }
 
     private static ServiceProvider ConfigureServices()
