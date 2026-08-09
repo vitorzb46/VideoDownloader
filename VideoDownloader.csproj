@@ -27,6 +27,10 @@
       <LogicalName>$(AssemblyName).Resources.$(RootNamespace).DownloadApplication.resources</LogicalName>
       <Generator></Generator>
     </EmbeddedResource>
+    <EmbeddedResource Update="Resources\TorrentDownloadService.resx">
+      <LogicalName>$(AssemblyName).Resources.$(RootNamespace).Services.Implementation.TorrentDownloadService.resources</LogicalName>
+      <Generator></Generator>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
