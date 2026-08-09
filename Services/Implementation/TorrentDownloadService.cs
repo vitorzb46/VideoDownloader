@@ -1,5 +1,7 @@
-﻿using MonoTorrent;
+﻿using Microsoft.Extensions.Localization;
+using MonoTorrent;
 using MonoTorrent.Client;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using VideoDownloader.Constantes;
@@ -7,13 +9,22 @@ using VideoDownloader.Progress;
 
 namespace VideoDownloader.Services.Implementation;
 
-internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings appContext)
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
+internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings appContext, IStringLocalizer<TorrentDownloadService> localizer)
 {
     private readonly AppSettings AppContext = appContext;
-    private ClientEngine Engine { get; } = engine;
+    private ClientEngine Engine { get; set; } = engine;
     private StringBuilder SB { get; } = new(1024);
     private static int LinhaInicialDeLogs { get; } = 25;
+    private IStringLocalizer<TorrentDownloadService> Localizer { get; } = localizer;
 
+    // Cores ANSI (funcionam no Windows Terminal / VS Code integrado)
+    private const string Verde = "\x1b[32m";
+    private const string Amarelo = "\x1b[33m";
+    private const string Vermelho = "\x1b[31m";
+    private const string Ciano = "\x1b[36m";
+    private const string Reset = "\x1b[0m";
+    private readonly Dictionary<Guid, TorrentManager> _torrents = [];
     /// <summary>
     /// Baixa todos os arquivos torrents da pasta informada.
     /// </summary>
@@ -31,7 +42,18 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         try
         {
             //var torrentSetings = new TorrentSettings();
-            List<TorrentManager> managers = await RegistrarTorrentsEngine(Engine, pastaTorrents, AppContext.PastaDownloads!).ConfigureAwait(false);
+            var managers = await RegistrarTorrentsEngine(Engine, AppContext, pastaTorrents, AppContext.PastaDownloads!).ConfigureAwait(false);
+
+            if (managers.Count == 0)
+            {
+                Console.WriteLine(Localizer["Torrent_NenhumEncontrado", pastaTorrents]);
+                return id;
+            }
+
+            foreach (var manager in managers)
+            {
+                _torrents[Guid.NewGuid()] = manager;
+            }
 
             await EventoHandler().ConfigureAwait(false);
 
@@ -39,7 +61,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.Message);
+            Console.WriteLine(Localizer["Torrent_ErroAoBaixar", ex.Message]);
             throw;
         }
 
@@ -62,59 +84,84 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
         try
         {
-            var torrentSetings = new TorrentSettings();
-            await Engine.AddAsync(magnet, pastaDownload, torrentSetings).ConfigureAwait(false);
+            TorrentSettings settingsBuilder = TorrentsConfig(AppContext);
+
+            var manager = await Engine.AddAsync(magnet, pastaDownload, settingsBuilder).ConfigureAwait(false);
+
+            _torrents[id] = manager;
+
             await EventoHandler().ConfigureAwait(false);
 
             await MainLoop(progress).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao baixar torrent: {ex.Message}");
+            Console.WriteLine(Localizer["Torrent_ErroAoBaixar", ex.Message]);
             throw;
         }
 
         return id;
     }
+    /// <summary>
+    /// Inicia o streaming de um magnet link, retornando uma Stream nativa do .NET
+    /// para assistir antes do download terminar (requer codec com metadados no início, ex.: MP4).
+    /// </summary>
+    /// <param name="magnet">Url magnética.</param>
+    /// <param name="token">Token de cancelamento.</param>
+    /// <returns>Stream do primeiro arquivo do torrent.</returns>
+    public async Task<Stream> StreamAsync(MagnetLink magnet, CancellationToken? token = default)
+    {
+        var cancellationToken = token ?? CancellationToken.None;
 
+        var pastaDownload = Path.Combine(Directory.GetCurrentDirectory(), AppContext.PastaDownloads ?? "Downloads");
+        Directory.CreateDirectory(pastaDownload);
+
+        var manager = await Engine.AddStreamingAsync(magnet, pastaDownload).ConfigureAwait(false);
+        await manager.StartAsync().ConfigureAwait(false);
+
+        var arquivo = manager.Files.FirstOrDefault();
+        return arquivo is null || manager.StreamProvider is null
+            ? throw new InvalidOperationException("Nenhum arquivo disponível para streaming.")
+            : await manager.StreamProvider.CreateStreamAsync(arquivo, cancellationToken).ConfigureAwait(false);
+    }
     private async Task EventoHandler()
     {
-        foreach (TorrentManager manager in Engine.Torrents)
+        foreach (var (id, manager) in _torrents)
         {
             manager.PeersFound += (o, e) =>
             {
                 if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
 
                 if (e.NewPeers == 0) return;
-                Console.WriteLine($"{e.GetType().Name}: {e.NewPeers} peers for {e.TorrentManager.Name}");
+                Console.WriteLine(Localizer["Torrent_PeersEncontrados", e.GetType().Name, e.NewPeers, e.TorrentManager.Name]);
             };
             manager.PeerConnected += (o, e) =>
             {
                 if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
 
-                Console.WriteLine($"Connection succeeded: {e.Peer.Uri}");
+                Console.WriteLine(Localizer["Torrent_ConexaoSucesso", e.Peer.Uri]);
             };
             manager.ConnectionAttemptFailed += (o, e) =>
             {
                 if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
 
-                Console.WriteLine($"Connection failed: {e.Peer.ConnectionUri}");
+                Console.WriteLine(Localizer["Torrent_ConexaoFalha", e.Peer.ConnectionUri]);
             };
             manager.TorrentStateChanged += async (o, e) =>
             {
                 if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
 
-                Console.WriteLine($"[Status] {e.TorrentManager.Name}: {e.NewState}");
+                Console.WriteLine(Localizer["Torrent_StatusMudanca", e.TorrentManager.Name, e.NewState]);
                 if (e.NewState == TorrentState.Error)
                 {
-                    Console.WriteLine($"[Erro] O torrent parou devido a uma falha interna.");
+                    Console.WriteLine(Localizer["Torrent_ErroInterno"]);
                     await e.TorrentManager.StopAsync().ConfigureAwait(false);
                 }
                 if (e.NewState == TorrentState.Seeding)
                 {
-                    Console.WriteLine($"[Sucesso] {e.TorrentManager.Name} finalizado!");
+                    Console.WriteLine(Localizer["Torrent_Sucesso", e.TorrentManager.Name]);
                     // Adicionar Seeding depois
-                    await e.TorrentManager.StopAsync().ConfigureAwait(false);
+                    await AbortarAsync(id).ConfigureAwait(false);
                 }
             };
             await manager.StartAsync().ConfigureAwait(false);
@@ -131,45 +178,90 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
             SB.Remove(0, SB.Length);
 
-            foreach (TorrentManager manager in Engine.Torrents)
+            // Resumo global (todos os torrents)
+            AppendSeparator(SB);
+            AppendFormat(SB, $" {Ciano}{_torrents.Count} torrent(s) ativo(s) | ↓ {FormatarBytes(Engine.TotalDownloadRate)}/s | ↑ {FormatarBytes(Engine.TotalUploadRate)}/s{Reset}");
+            AppendSeparator(SB);
+
+            foreach (var (id, _) in _torrents)
             {
-                double progresso = manager.Progress;
+                var p = ObterProgresso(id);
+                var tempoEstimado = TempoEstimado(p, p.Percentual * 100d);
 
-                if (manager.State == TorrentState.Seeding)
+                var cor = p.Estado switch
                 {
-                    progresso = 100.0;
-                }
-                string etaTexto = TempoEstimado(manager, progresso);
-                double velocidadeDownload = Engine.TotalDownloadRate / 1048576.0;
-                double velocidadeUpload = Engine.TotalUploadRate / 1048576.0;
+                    TorrentEstado.Concluido or TorrentEstado.Semeando => Verde,
+                    TorrentEstado.Erro => Vermelho,
+                    _ => Amarelo,
+                };
 
-                AppendSeparator(SB);
                 AppendFormat(SB, "");
-                AppendFormat(SB, $"{Multi(2)}{(manager.Torrent == null ? "Meta Data" : manager.Torrent.Name)}");
-                AppendFormat(SB, "");
-                AppendSeparator(SB);
-                AppendFormat(SB, $" Status: {manager.State} | Tempo restante: {etaTexto} | Download: {velocidadeDownload:0.00} MB/s ↓ | Upload: {velocidadeUpload:0.00} MB/s ↑ | Peers: {manager.Peers.Seeds}/{manager.Peers.Available}");
-                BarraDeProgresso(progress, SB, progresso, "Progresso: ");
+                AppendFormat(SB, $"{Ciano}{Multi(2)}{p.Nome} {Reset}[{Amarelo}{id:N}{Reset}]");
+                AppendFormat(SB, $" Status: {cor}{p.Estado}{Reset} | Tempo restante: {tempoEstimado} | Download: {FormatarBytes(p.VelocidadeDownload)}/s ↓ | Upload: {FormatarBytes(p.VelocidadeUpload)}/s ↑ | Peers: {p.Seeds}/{p.Peers}");
+                AppendFormat(SB, $" Baixado: {FormatarBytes(p.BytesBaixados)} de {FormatarBytes(p.TamanhoTotal)}");
+                BarraDeProgresso(progress, SB, p.Percentual, $"Progresso: {p.Percentual * 100:0.0}% ");
             }
 
+            // Rodapé de ajuda
+            AppendSeparator(SB);
+            AppendFormat(SB, " [Q] Abortar todos | [A] Abortar por id | Ctrl+C para sair");
+
             Console.WriteLine(SB.ToString());
+
+            if (Console.KeyAvailable)
+            {
+                var tecla = Console.ReadKey(intercept: true).Key;
+                if (tecla == ConsoleKey.Q)
+                {
+                    Console.WriteLine(Localizer["Torrent_AbortandoTodos"]);
+                    foreach (var id in _torrents.Keys.ToList())
+                    {
+                        await AbortarAsync(id).ConfigureAwait(false);
+                    }
+                    break;
+                }
+                else if (tecla == ConsoleKey.A)
+                {
+                    Console.WriteLine(Localizer["Torrent_DigiteId"]);
+                    if (Guid.TryParse(Console.ReadLine(), out var idAbortar))
+                    {
+                        await AbortarAsync(idAbortar).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        Console.WriteLine(Localizer["Torrent_IdInvalido"]);
+                    }
+                }
+            }
+
             await Task.Delay(35).ConfigureAwait(false);
         }
     }
-    private string TempoEstimado(TorrentManager manager, double progresso)
+    private static string FormatarBytes(double bytes)
     {
-        long bytesRestantes = Engine.TotalDownloadRate - manager.Monitor.DataBytesReceived;
-        double velocidade = manager.Monitor.DownloadRate;
+        return bytes switch
+        {
+            >= 1_073_741_824 => $"{bytes / 1_073_741_824:0.00} GB",
+            >= 1_048_576 => $"{bytes / 1_048_576:0.0} MB",
+            >= 1024 => $"{bytes / 1024:0} KB",
+            _ => $"{bytes:0} B",
+        };
+    }
+
+    private static string TempoEstimado(TorrentProgress p, double progresso)
+    {
+        long bytesRestantes = p.TamanhoTotal - p.BytesBaixados;
+        double velocidade = p.VelocidadeDownload;
         double etaSegundos = velocidade > 0 ? bytesRestantes / velocidade : double.PositiveInfinity;
 
         string etaTexto;
-        if (manager.State == TorrentState.Seeding || progresso >= 100.0)
+        if (p.Estado is TorrentEstado.Semeando or TorrentEstado.Concluido || progresso >= 100.0)
         {
             etaTexto = "Concluído ";
         }
         else if (double.IsPositiveInfinity(etaSegundos))
         {
-            etaTexto = "Parado ";
+            etaTexto = p.Estado == TorrentEstado.Baixando ? "Buscando peers... " : "Parado ";
         }
         else
         {
@@ -219,7 +311,8 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
     {
         return $"{new string(str, vezes)}";
     }
-    private static async Task<List<Torrent>> CarregarTodosTorrentsDaPasta(string caminhoDaPasta)
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Um arquivo com erro não pode impedir o carregamento dos demais torrents da pasta.")]
+    private async Task<List<Torrent>> CarregarTodosTorrentsDaPasta(string caminhoDaPasta)
     {
         var listaDeTorrents = new List<Torrent>();
         Directory.CreateDirectory(caminhoDaPasta);
@@ -234,25 +327,25 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
                 if (Path.GetExtension(torrent.Name) == ".scr")
                 {
-                    Console.WriteLine($"[Aviso] '{Path.GetFileName(arquivo)}' está tentando baixar cache externo e foi ignorado.");
+                    Console.WriteLine(Localizer["Torrent_AvisoCache", Path.GetFileName(arquivo)]);
                 }
                 else
                 {
                     lock (listaDeTorrents)
                     {
                         listaDeTorrents.Add(torrent);
-                    } 
-                }                               
+                    }
+                }
             }
             catch (Exception ex)
             {
                 if (ex.Message.Contains("torrent", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"[Erro] Falha ao carregar o arquivo '{Path.GetFileName(arquivo)}'");
+                    Console.WriteLine(Localizer["Torrent_FalhaCarregar", Path.GetFileName(arquivo)]);
                 }
                 else
                 {
-                    Console.WriteLine($"Erro ao processar '{Path.GetFileName(arquivo)}': {ex.Message}");
+                    Console.WriteLine(Localizer["Torrent_ErroProcessar", Path.GetFileName(arquivo), ex.Message]);
                 }
             }
         });
@@ -261,27 +354,77 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
         return listaDeTorrents;
     }
-    private static async Task<List<TorrentManager>> RegistrarTorrentsEngine(ClientEngine engine, string pastaDosTorrents, string pastaDeDestino)
+    private async Task<List<TorrentManager>> RegistrarTorrentsEngine(ClientEngine engine, AppSettings app, string pastaDosTorrents, string pastaDeDestino)
     {
         List<Torrent> listaDeTorrents = await CarregarTodosTorrentsDaPasta(pastaDosTorrents).ConfigureAwait(false);
 
+        TorrentSettings settingsBuilder = TorrentsConfig(app);
+
         var listaDeManagers = new List<TorrentManager>();
 
-        Console.WriteLine($"\nRegistrando {listaDeTorrents.Count} torrents no Engine...");
+        Console.WriteLine(Localizer["Torrent_Registrando", listaDeTorrents.Count]);
 
         foreach (var torrent in listaDeTorrents)
         {
             try
             {
-                TorrentManager manager = await engine.AddAsync(torrent, pastaDeDestino).ConfigureAwait(false);
+                TorrentManager manager = await engine.AddAsync(torrent, pastaDeDestino, settingsBuilder).ConfigureAwait(false);
                 listaDeManagers.Add(manager);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Erro] Não foi possível registrar {torrent.Name}: {ex.Message}");
+                Console.WriteLine(Localizer["Torrent_FalhaRegistrar", torrent.Name, ex.Message]);
             }
         }
-
         return listaDeManagers;
+    }
+
+    private static TorrentSettings TorrentsConfig(AppSettings app)
+    {
+        return new TorrentSettingsBuilder
+        {
+            AllowDht = true,
+            AllowInitialSeeding = true,
+            AllowPeerExchange = true,
+            CreateContainingDirectory = true,
+            MaximumConnections = app.ConnectionsMaxima,
+            UploadSlots = app.UploadSlotsMaximo,
+            MaximumDownloadRate = app.TorrentLimiteDownload,
+            MaximumUploadRate = app.TorrentLimiteUpload
+        }.ToSettings();
+    }
+    private TorrentProgress ObterProgresso(Guid id)
+    {
+        var manager = _torrents[id];
+
+        var estado = manager.State switch
+        {
+            TorrentState.Error => TorrentEstado.Erro,
+            TorrentState.Seeding => TorrentEstado.Semeando,
+            TorrentState.Stopped or TorrentState.Paused => TorrentEstado.Pausado,
+            _ when manager.Progress >= 100d => TorrentEstado.Concluido,
+            _ => TorrentEstado.Baixando,
+        };
+
+        return new TorrentProgress(
+            id,
+            manager.Torrent?.Name ?? manager.Name ?? id.ToString(),
+            manager.Progress / 100d,
+            manager.Monitor.DataBytesReceived,
+            manager.Torrent?.Size ?? 0,
+            manager.Monitor.DownloadRate,
+            manager.Monitor.UploadRate,
+            manager.Peers.Seeds,
+            manager.Peers.Leechs,
+            estado);
+    }
+    private async Task AbortarAsync(Guid id)
+    {
+        if (_torrents.TryGetValue(id, out var manager))
+        {
+            await manager.StopAsync().ConfigureAwait(false);
+            await Engine.RemoveAsync(manager).ConfigureAwait(false);
+            _torrents.Remove(id);
+        }
     }
 }
