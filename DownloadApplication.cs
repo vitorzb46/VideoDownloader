@@ -10,6 +10,11 @@ namespace VideoDownloader;
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
 internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLService ydl, TorrentDownloadService torrent, IStringLocalizer<DownloadApplication> localizer)
 {
+    // ys reservado para quando os métodos de áudio/playlist do YoutubeExplodeService forem reativados.
+#pragma warning disable CS9113, CA1823
+    private readonly YoutubeExplodeService _ys = ys;
+#pragma warning restore CS9113, CA1823
+
     public async Task Executar(string[] args)
     {
         
@@ -41,6 +46,9 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
                     break;
                 case "TORRENT":
                     await BaixarTorrent(args).ConfigureAwait(false);
+                    break;
+                case "STREAM":
+                    await StreamarTorrent(args).ConfigureAwait(false);
                     break;
                 case "HELP" or "-H" or "--HELP":
                     Console.WriteLine(localizer["Console_Uso"]);
@@ -103,6 +111,7 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
         //await ys.MostrarPlaylistAsync(url).ConfigureAwait(false);
     }
 
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "O fallback de pasta não pode interromper o fluxo quando a entrada não é um magnet válido.")]
     private async Task BaixarTorrent(string[] args)
     {
         if (args.Length < 2)
@@ -137,6 +146,34 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
                 Console.WriteLine(localizer["Console_TorrentInvalido", input]);
                 return;
             }
+        }
+    }
+
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Falhas de streaming são reportadas como mensagem amigável ao usuário.")]
+    private async Task StreamarTorrent(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine(localizer["Console_UsoStream"]);
+            return;
+        }
+
+        if (!MagnetLink.TryParse(args[1], out var magnet))
+        {
+            Console.WriteLine(localizer["Console_MagnetInvalido", args[1]]);
+            return;
+        }
+
+        try
+        {
+            Console.WriteLine(localizer["Stream_Iniciado"]);
+            await using var stream = await torrent.StreamAsync(magnet).ConfigureAwait(false);
+            Console.WriteLine(localizer["Stream_Pronto", stream.Length]);
+            Console.ReadKey(true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(localizer["Stream_Erro", ex.Message]);
         }
     }
 

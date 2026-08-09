@@ -67,6 +67,7 @@ Comandos:
   playlist &lt;url&gt;            Baixa todos os vídeos da playlist
   mostrar &lt;url&gt;             Lista os vídeos de uma playlist
   torrent &lt;magnet&gt;          Baixa um torrent via magnet link
+  stream &lt;magnet&gt;           Inicia streaming do torrent (MP4)
   help                       Mostra esta ajuda</value>
   </data>
   <data name="Console_UsoVideo" xml:space="preserve">
@@ -83,6 +84,18 @@ Comandos:
   </data>
   <data name="Console_UsoTorrent" xml:space="preserve">
 	<value>Uso: vdm torrent &lt;magnet&gt;</value>
+  </data>
+  <data name="Console_UsoStream" xml:space="preserve">
+	<value>Uso: vdm stream &lt;magnet&gt;</value>
+  </data>
+  <data name="Stream_Iniciado" xml:space="preserve">
+	<value>Iniciando streaming do torrent...</value>
+  </data>
+  <data name="Stream_Pronto" xml:space="preserve">
+	<value>Streaming pronto. Tamanho: {0} bytes. Pressione qualquer tecla para encerrar.</value>
+  </data>
+  <data name="Stream_Erro" xml:space="preserve">
+	<value>Erro no streaming: {0}</value>
   </data>
   <data name="Console_MagnetInvalido" xml:space="preserve">
 	<value>Magnet link inválido: '{0}'</value>
