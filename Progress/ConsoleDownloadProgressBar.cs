@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Spectre.Console;
 
 namespace VideoDownloader.Progress;
 
@@ -56,7 +57,7 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
         if (sb == null)
         {
 
-            Console.Write($"\r{_title}: [{new string('■', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
+            AnsiConsole.WriteLine($"\r{_title}: [[{new string('■', preenchido)}{new string(' ', vazio)}]] {percentage,3}%");
 
             if (percentage >= 100)
             {
@@ -66,7 +67,7 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
         }
         else
         {
-            sb.Append(CultureInfo.InvariantCulture, $" {_title}: [{new string('=', preenchido)}{new string(' ', vazio)}] {percentage,3}%");
+            sb.Append(CultureInfo.InvariantCulture, $" {_title}: [[{new string('■', preenchido)}{new string(' ', vazio)}]]");
 
             if (percentage >= 100)
             {
