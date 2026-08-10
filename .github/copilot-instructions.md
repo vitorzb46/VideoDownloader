@@ -12,6 +12,7 @@ This repository is integrated with local system skills. Whenever any of the foll
 - **`/ponytail-gain`**: Load minimalist performance optimization rules from the `ponytail-gain` folder.
 - **`/ponytail-help`**: Consult the manual located in the `ponytail-help` folder.
 - **`/debug`** or **`systematic-debugging`**: Activate the investigation skill from the `systematic-debugging` folder. This strictly enforces the "Iron Law": you are forbidden from proposing fixes without first isolating and proving the exact root cause of the error.
+- **`/sugestoes-usuario`** or **`sugestoes-usuario`**: Load personal user preferences from the `sugestoes-usuario` folder. Includes the rule that final summaries of requested modifications must be as concise as possible (state final + what's missing / next steps).
 
 ## 2. Context Pipeline (The Fallback Rules)
 - **TIER 1 (Primary Source)**: Read `./.github/contexto_projeto.md` first. This file contains the architecture map, method signatures, and dependency relations. Use it to understand the codebase structure without scanning raw code.
@@ -27,4 +28,4 @@ This repository is integrated with local system skills. Whenever any of the foll
 - Keep code explanations concise, focusing strictly on the changes made rather than rewriting unchanged boilerplate code.
 
 ## 5. Git Commit Process
-- Para commits, apresente o conteúdo da mensagem de commit diretamente no chat para o usuário aprovar antes de executar o git commit.
+- For commits, show message's contents on chat before send commit. 
