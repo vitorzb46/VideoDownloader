@@ -2,7 +2,6 @@
 using MonoTorrent.Client;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text;
 using VideoDownloader;
 using VideoDownloader.Constantes;
@@ -11,13 +10,13 @@ using YoutubeExplode;
 
 [assembly: System.Resources.NeutralResourcesLanguage("pt-BR")]
 internal sealed partial class Program
-{    
+{
     private static async Task Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
 
         // System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo("en-US");
-        
+
         var serviceProvider = ConfigureServices();
 
         var app = serviceProvider.GetRequiredService<DownloadApplication>();
@@ -57,7 +56,7 @@ internal sealed partial class Program
                 AutoSaveLoadMagnetLinkMetadata = true,
                 AutoSaveLoadDhtCache = true,
                 UsePartialFiles = false, // Desativado para ajudar o VLC a ler o arquivo direto
-                DiskCacheBytes = 50 * 1024 * 1024, // 50MB de RAM dedicada a cache (ótimo para streaming)
+                DiskCacheBytes = 50 * 1024 * 1024, // 50MB de RAM dedicada a cache
 
                 // --- STREAMING E WEBSEEDS ---
                 HttpStreamingPrefix = $"http://127.0.0.1:{portaLivre}/torrent-stream/",

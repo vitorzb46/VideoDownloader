@@ -12,11 +12,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+	<PackageReference Include="LibVLCSharp" Version="3.10.1" />
 	<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0-preview.6.26359.118" />
     <PackageReference Include="Microsoft.Extensions.Localization" Version="11.0.0-preview.6.26359.118" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
     <PackageReference Include="MonoTorrent" Version="3.0.2" />
     <PackageReference Include="Spectre.Console" Version="0.57.3-alpha.0.7" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
     <PackageReference Include="Xabe.FFmpeg.Downloader" Version="6.0.2" />
     <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
     <PackageReference Include="YoutubeExplode" Version="6.6.1-a.1" />

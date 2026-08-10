@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Localization;
 using MonoTorrent;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using VideoDownloader.Services.Implementation;
 using VideoDownloader.Youtube.Implementation;
@@ -17,10 +16,10 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
 
     public async Task Executar(string[] args)
     {
-        
-        
-        args = ["torrent", "magnet:?xt=urn:btih:3EAE86E3ECFE8BC7E3151F56285D47FA9E60514F&dn=Silo+S03E06+1080p+HEVC+x265-MeGusta&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.dler.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.ololosh.space%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.dump.cl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.bittor.pw%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker-udp.gbitt.info%3A80%2Fannounce&tr=udp%3A%2F%2Fretracker01-msk-virt.corbina.net%3A80%2Fannounce&tr=udp%3A%2F%2Fopen.free-tracker.ga%3A6969%2Fannounce&tr=udp%3A%2F%2Fns-1.x-fins.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fleet-tracker.moe%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.open-internet.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.pirateparty.gr%3A6969%2Fannounce&tr=udp%3A%2F%2Fdenis.stalker.upeer.me%3A6969%2Fannounce"];
-        
+
+
+        args = ["torrent", "torrents"];
+
 
         if (args.Length == 0)
         {
@@ -158,7 +157,7 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             return;
         }
 
-        if (!MagnetLink.TryParse(args[1], out var magnet))
+        if (!MagnetLink.TryParse(args[2], out var magnet))
         {
             Console.WriteLine(localizer["Console_MagnetInvalido", args[1]]);
             return;
@@ -167,8 +166,8 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
         try
         {
             Console.WriteLine(localizer["Stream_Iniciado"]);
-            await using var stream = await torrent.StreamAsync(magnet).ConfigureAwait(false);
-            Console.WriteLine(localizer["Stream_Pronto", stream.Length]);
+            using var stream = await torrent.StreamAsync(magnet).ConfigureAwait(false);
+            Console.WriteLine(localizer["Stream_Pronto", stream.ToString()!]);
             Console.ReadKey(true);
         }
         catch (Exception ex)

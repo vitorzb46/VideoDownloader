@@ -1,6 +1,6 @@
+using Spectre.Console;
 using System.Globalization;
 using System.Text;
-using Spectre.Console;
 
 namespace VideoDownloader.Progress;
 
@@ -43,8 +43,6 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
                 return;
             }
 
-            if (rounded == _lastPercent) return;
-
             _lastPercent = rounded;
             Render(rounded, sb);
         }
@@ -52,12 +50,20 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
     private void Render(int percentage, StringBuilder? sb)
     {
         var preenchido = (int)Math.Round(_width * (percentage / 100d));
+        preenchido = Math.Clamp(preenchido, 0, _width);
         var vazio = _width - preenchido;
+
+        var cor = percentage switch
+        {
+            >= 70 => "cyan",
+            >= 30 => "yellow",
+            _ => "red"
+        };
 
         if (sb == null)
         {
 
-            AnsiConsole.WriteLine($"\r{_title}: [[{new string('■', preenchido)}{new string(' ', vazio)}]] {percentage,3}%");
+            AnsiConsole.MarkupLine($" {_title}: [[[{cor}]{new string('-', preenchido)}{new string(' ', vazio)}[/]]]");
 
             if (percentage >= 100)
             {
@@ -67,7 +73,7 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
         }
         else
         {
-            sb.Append(CultureInfo.InvariantCulture, $" {_title}: [[{new string('■', preenchido)}{new string(' ', vazio)}]]");
+            sb.Append(CultureInfo.InvariantCulture, $" {_title}: [[[{cor}]{new string('-', preenchido)}{new string(' ', vazio)}[/]]]");
 
             if (percentage >= 100)
             {
@@ -83,6 +89,5 @@ internal sealed class ConsoleDownloadProgressBar : IProgress<double>, IDisposabl
         }
 
         _disposed = true;
-        // Report(1d);
     }
 }
