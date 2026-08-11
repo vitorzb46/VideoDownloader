@@ -5,7 +5,6 @@ using System.Net;
 using System.Text.RegularExpressions;
 using VideoDownloader.Constantes;
 using VideoDownloader.Progress;
-using YoutubeDLSharp;
 
 namespace VideoDownloader.Services.Implementation;
 
@@ -220,12 +219,13 @@ internal sealed partial class YoutubeDLService(AppSettings appContext)
 
         if (!File.Exists(ytDlpPath))
         {
-            await Utils.DownloadYtDlp().ConfigureAwait(false);
+            // DownloadYtDlp(string) baixa o yt-dlp para o caminho informado.
+            await YoutubeDLSharp.Utils.DownloadYtDlp(ytDlpPath).ConfigureAwait(false);
         }
 
         if (!File.Exists(ffmpegPath))
         {
-            await Utils.DownloadFFmpeg().ConfigureAwait(false);
+            await YoutubeDLSharp.Utils.DownloadFFmpeg(ffmpegPath).ConfigureAwait(false);
         }
     }
     private static string ResolvePath(string basePath, string? fileName)

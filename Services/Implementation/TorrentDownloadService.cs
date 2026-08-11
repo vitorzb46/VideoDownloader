@@ -1,10 +1,10 @@
-﻿using LibVLCSharp.Shared;
-using Microsoft.Extensions.Localization;
+﻿using Microsoft.Extensions.Localization;
 using MonoTorrent;
 using MonoTorrent.Client;
 using MonoTorrent.Streaming;
 using Spectre.Console;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -13,6 +13,11 @@ using VideoDownloader.Constantes;
 using VideoDownloader.Progress;
 
 namespace VideoDownloader.Services.Implementation;
+
+/// <summary>
+/// Resultado do streaming: prefixo HTTP e URL completa do stream, para o Player WPF.
+/// </summary>
+public sealed record StreamResult(string HttpPrefix, string FullUri);
 
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes")]
 internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings appContext, IStringLocalizer<TorrentDownloadService> localizer)
@@ -111,13 +116,13 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         return id;
     }
     /// <summary>
-    /// Inicia o streaming de um magnet link, retornando uma Stream nativa do .NET
-    /// para assistir antes do download terminar
+    /// Inicia o streaming de um magnet link, abrindo o Player WPF e monitorando os eventos
+    /// do manager até o Player ser fechado.
     /// </summary>
     /// <param name="magnet">Url magnética.</param>
-    /// <param name="token">Token de cancelamento.</param>
-    /// <returns>Stream do primeiro arquivo do torrent.</returns>
-    public async Task<IHttpStream> StreamAsync(MagnetLink magnet, IProgress<double>? progress = null)
+    /// <param name="progress">Barra de progresso.</param>
+    /// <returns>Resultado do streaming (HttpPrefix + FullUri).</returns>
+    public async Task<StreamResult> StreamAsync(MagnetLink magnet, IProgress<double>? progress = null)
     {
         var id = Guid.NewGuid();
         using var cts = new CancellationTokenSource();
@@ -131,19 +136,57 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             TorrentSettings settingsBuilder = TorrentsConfig(AppContext);
             var manager = await Engine.AddStreamingAsync(magnet, pastaDownload, settingsBuilder).ConfigureAwait(false);
 
-            if (manager == null) return null!;
+            if (manager == null)
+            {
+                throw new InvalidOperationException("Falha ao criar o gerenciador de streaming.");
+            }
 
             _torrents[id] = manager;
 
             await EventoHandler(cts, cancellationToken).ConfigureAwait(false);
 
-            // Configurações de Stream e VLC
-            (IHttpStream stream, LibVLC libVLC, MediaPlayer mediaPlayer, Media media) = await VLC(manager, cancellationToken).ConfigureAwait(false);
+            // Cria o stream HTTP sequencial (o Player WPF reproduz a URL retornada).
+            // O stream permanece vivo enquanto o Player está aberto (using var).
+            var maiorArquivo = manager.Files.OrderBy(t => t.Length).Last();
+            using var stream = await manager.StreamProvider!.CreateHttpStreamAsync(maiorArquivo, true, cancellationToken).ConfigureAwait(false);
 
-            // Gerenciador do ciclo de vida de execução
-            using CancellationTokenRegistration disposer = await CicloStreaming(progress, stream, mediaPlayer, cts, cancellationToken).ConfigureAwait(false);
+            var playerExe = Path.Combine(System.AppContext.BaseDirectory, "VideoDownloader.Player.exe");
+            if (!File.Exists(playerExe))
+            {
+                // Fallback: diretório de trabalho atual (ex.: build manual separado).
+                playerExe = Path.Combine(Directory.GetCurrentDirectory(), "VideoDownloader.Player.exe");
+            }
 
-            return stream;
+            if (!File.Exists(playerExe))
+            {
+                throw new FileNotFoundException($"Player não encontrado: {playerExe}");
+            }
+
+            Console.WriteLine($"Streaming pronto: {stream.FullUri}");
+            using var player = Process.Start(new ProcessStartInfo
+            {
+                FileName = playerExe,
+                Arguments = $"\"{stream.FullUri}\"",
+                UseShellExecute = true,
+            });
+
+            // Exibe os eventos do manager enquanto o Player está aberto.
+            if (player is not null)
+            {
+                while (!player.HasExited)
+                {
+                    ExibirLogs();
+                    foreach (var (_, nome, estado, seeds, peers) in EstadoDosTorrents())
+                    {
+                        // [[ ]] = colchetes literais; nome escapado para markup seguro.
+                        string nomeEscape = Markup.Escape(nome);
+                        AnsiConsole.MarkupLine($"[[{nomeEscape}]] [cyan]{estado}[/] | seeds: {seeds} | peers: {peers}");
+                    }
+                    await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            return new StreamResult(stream.HttpPrefix, stream.FullUri);
         }
         catch (OperationCanceledException)
         {
@@ -163,28 +206,20 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             string nomeEscapado = Markup.Escape(manager.Name);
             manager.PeersFound += (o, e) =>
             {
-                if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
-
                 if (e.NewPeers == 0) return;
                 string peers = $"[cyan]{e.NewPeers}[/]";
                 AdicionarLog(Localizer["Torrent_PeersEncontrados", e.GetType().Name, peers, nomeEscapado]);
             };
             manager.PeerConnected += (o, e) =>
             {
-                if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
-
-                AdicionarLog(Localizer["Torrent_ConexaoSucesso", e.Peer.Uri]);
+                AdicionarLog(Localizer["Torrent_ConexaoSucesso", Markup.Escape(e.Peer.Uri.ToString())]);
             };
             manager.ConnectionAttemptFailed += (o, e) =>
             {
-                if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
-
-                AdicionarLog(Localizer["Torrent_ConexaoFalha", e.Peer.ConnectionUri]);
+                AdicionarLog(Localizer["Torrent_ConexaoFalha", Markup.Escape(e.Peer.ConnectionUri.ToString())]);
             };
             manager.TorrentStateChanged += async (o, e) =>
             {
-                if (Console.GetCursorPosition().Top < LinhaInicialDeLogs) Console.SetCursorPosition(0, LinhaInicialDeLogs);
-
                 AdicionarLog(Localizer["Torrent_StatusMudanca", nomeEscapado, e.NewState]);
                 if (e.NewState == TorrentState.Error)
                 {
@@ -203,7 +238,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 }
             };
             await manager.StartAsync().ConfigureAwait(false);
-            if (manager.HasMetadata) Console.WriteLine($"{manager.Name} - aguardando metadados!");
+            if (!manager.HasMetadata) Console.WriteLine($"{manager.Name} - aguardando metadados!");
             await manager.WaitForMetadataAsync(token).ConfigureAwait(false);
         }
     }
@@ -376,74 +411,6 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 AdicionarLog($"[green][Fila][/] Iniciando download agendado de: {manager.Name}");
             }
         }
-    }
-    private async Task<CancellationTokenRegistration> CicloStreaming(IProgress<double>? progress, IHttpStream stream, MediaPlayer mediaPlayer, CancellationTokenSource cts, CancellationToken cancellationToken)
-    {
-        var tcs = new TaskCompletionSource<bool>();
-        var disposer = cancellationToken.Register(() =>
-        {
-            mediaPlayer.Stop();
-            stream.Dispose();
-            tcs.TrySetResult(true);
-        });
-
-        mediaPlayer.EndReached += (o, e) =>
-        {
-            stream.Dispose();
-            tcs.TrySetResult(true);
-        };
-
-        mediaPlayer.EncounteredError += (o, e) =>
-        {
-            stream.Dispose();
-            tcs.TrySetResult(false);
-        };
-
-        while (!tcs.Task.IsCompleted && !cancellationToken.IsCancellationRequested)
-        {
-            await MainLoop(cts, cancellationToken, progress).ConfigureAwait(false);
-        }
-
-        await tcs.Task.ConfigureAwait(false);
-
-        cancellationToken.ThrowIfCancellationRequested();
-        return disposer;
-    }
-
-    private static async Task<(IHttpStream stream, LibVLC libVLC, MediaPlayer mediaPlayer, Media media)> VLC(TorrentManager manager, CancellationToken cancellationToken)
-    {
-        var maiorArquivo = manager.Files.OrderBy(t => t.Length).Last();
-
-        var stream = await manager.StreamProvider!.CreateHttpStreamAsync(maiorArquivo, true, cancellationToken).ConfigureAwait(false);
-
-        string routableAddress = stream.FullUri;
-
-        Core.Initialize();
-
-        var opcoesGlobais = new string[]
-        {
-                "--no-metadata-network-lookup",
-                "--no-embedded-video",
-                "--no-video-decorations",
-                "--fullscreen",
-                $"--video-title=Assistindo: {manager.Name}"
-        };
-        using var libVLC = new LibVLC(opcoesGlobais);
-        using var mediaPlayer = new MediaPlayer(libVLC);
-
-        using var media = new Media(libVLC, routableAddress, FromType.FromLocation);
-
-        media.AddOption(":network-caching=2000");
-        media.AddOption(":clock-synchro=0");
-        media.AddOption(":clock-jitter=5000");
-        media.AddOption(":audio-language=por,eng");
-        media.AddOption(":sub-language=por");
-        media.AddOption(":sub-margin=50");
-        media.AddOption(":freetype-rel-fontsize=16");
-        media.AddOption(":freetype-color=16777215");
-
-        mediaPlayer.Play(media);
-        return (stream, libVLC, mediaPlayer, media);
     }
     private static string FormatarBytes(double bytes)
     {
@@ -620,6 +587,40 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             HistoricoDeLogs.TryDequeue(out _);
         }
     }
+
+    /// <summary>
+    /// Exibe no console os logs acumulados dos eventos do manager (peers, conexões, estado).
+    /// Usado pelo CLI durante o streaming, quando o MainLoop não está rodando.
+    /// </summary>
+    public void ExibirLogs()
+    {
+        while (HistoricoDeLogs.TryDequeue(out var log))
+        {
+            try
+            {
+                AnsiConsole.MarkupLine(log);
+            }
+            catch (InvalidOperationException)
+            {
+                // Fallback: se o markup estiver malformado, exibe o texto puro.
+                Console.WriteLine(Markup.Escape(log));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Snapshot do estado atual dos torrents ativos (para o CLI mostrar peers/estado no streaming).
+    /// </summary>
+    public IReadOnlyList<(Guid Id, string Nome, TorrentState Estado, int Seeds, int Peers)> EstadoDosTorrents()
+    {
+        return [.. _torrents.Values.Select(m => (
+            _torrents.First(p => p.Value == m).Key,
+            m.Torrent?.Name ?? m.Name ?? "?",
+            m.State,
+            m.Peers.Seeds,
+            m.Peers.Available))];
+    }
+
     private static string Multi(int vezes = 0, char c = '\t')
     {
         return $"{new string(c, vezes)}";

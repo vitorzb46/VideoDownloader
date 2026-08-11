@@ -17,9 +17,10 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
     public async Task Executar(string[] args)
     {
 
-
-        args = ["torrent", "torrents"];
-
+        if (System.Diagnostics.Debugger.IsAttached)
+        {
+            args = ["stream", "magnet:?xt=urn:btih:212488687F9CBDFD74CEDBA7A43EEB91FE82C271&dn=%5Bbitsearch.to%5D%20Silo.S03E04.1080p.HEVC.x265-MeGusta%5BEZTVx.to%5D.mkv&tr=DHT&tr=udp%3A%2F%2Fbittorrent-tracker.e-n-c-r-y-p-t.net%3A1337%2Fannounce&tr=udp%3A%2F%2Fevan.im%3A6969%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce"];
+        }
 
         if (args.Length == 0)
         {
@@ -147,7 +148,6 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             }
         }
     }
-
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Falhas de streaming são reportadas como mensagem amigável ao usuário.")]
     private async Task StreamarTorrent(string[] args)
     {
@@ -157,7 +157,7 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
             return;
         }
 
-        if (!MagnetLink.TryParse(args[2], out var magnet))
+        if (!MagnetLink.TryParse(args[1], out var magnet))
         {
             Console.WriteLine(localizer["Console_MagnetInvalido", args[1]]);
             return;
@@ -166,9 +166,9 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
         try
         {
             Console.WriteLine(localizer["Stream_Iniciado"]);
-            using var stream = await torrent.StreamAsync(magnet).ConfigureAwait(false);
-            Console.WriteLine(localizer["Stream_Pronto", stream.ToString()!]);
-            Console.ReadKey(true);
+            var acesso = new AcessoProjetoPrincipal();
+            var resultado = await torrent.StreamAsync(magnet).ConfigureAwait(false);
+            acesso.SetPrefix(resultado.HttpPrefix);
         }
         catch (Exception ex)
         {
@@ -197,5 +197,14 @@ internal sealed class DownloadApplication(YoutubeExplodeService ys, YoutubeDLSer
     {
         return Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) &&
                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+}
+[SuppressMessage("Performance", "CA1515: Consider making public types internal", Justification = "Classe pública para acesso à propriedade do projeto principal.")]
+public class AcessoProjetoPrincipal
+{
+    public string? HttpPrefix { get; set; }
+    public void SetPrefix(string prefix)
+    {
+        HttpPrefix = prefix;
     }
 }
