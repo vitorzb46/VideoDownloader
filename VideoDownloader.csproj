@@ -26,6 +26,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Projeto WPF separado: exclui a subpasta Player dos globs padrão do SDK
+         (Compile/Page/None/EmbeddedResource), evitando que o console compile os fontes WPF. -->
+    <Compile Remove="Player\**" />
+    <Page Remove="Player\**" />
+    <ApplicationDefinition Remove="Player\**" />
+    <None Remove="Player\**" />
+    <EmbeddedResource Remove="Player\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Update="Resources\DownloadApplication.resx">
       <LogicalName>$(AssemblyName).Resources.$(RootNamespace).DownloadApplication.resources</LogicalName>
       <Generator></Generator>
