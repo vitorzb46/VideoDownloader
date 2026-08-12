@@ -1,3 +1,6 @@
 <Solution>
+  <Folder Name="/Player/">
+    <Project Path="Player/VideoDownloader.Player.csproj" />
+  </Folder>
   <Project Path="VideoDownloader.csproj" />
 </Solution>

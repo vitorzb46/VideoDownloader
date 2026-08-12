@@ -8,6 +8,7 @@ gerar_contexto.bat
 
 # Documento de plano (local, avaliação)
 docs/plano-torrent-service.md
+docs/plano-media-player.md
 
 # dotenv files
 .env

@@ -2,7 +2,11 @@
 
 Um gerenciador de downloads via terminal rápido e eficiente construído em C# .NET 10.0. O aplicativo permite baixar vídeos da internet manipulando diretamente o `yt-dlp` e oferece suporte a downloads de arquivos torrent e streaming via `MonoTorrent`.
 
+<<<<<<< HEAD
 ## ∟ Funcionalidades
+=======
+## 🚀 Funcionalidades
+>>>>>>> 7dafd4612fa8887c340fbb716fade2c8f4da394d
 
 * **Downloads de Vídeo**: Suporte a downloads de vídeos individuais ou playlists completas via `yt-dlp`.
 * **Extração de Áudio**: Baixa diretamente o áudio convertido a partir de links de vídeo.
@@ -13,7 +17,11 @@ Um gerenciador de downloads via terminal rápido e eficiente construído em C# .
 * **Interface CLI**: Totalmente controlado por argumentos de linha de comando simples.
 * **Localização**: Mensagens centralizadas em arquivos `.resx` (pt-BR).
 
+<<<<<<< HEAD
 ## ∟ Tecnologias Utilizadas (Stacks)
+=======
+## 🛠️ Tecnologias Utilizadas
+>>>>>>> 7dafd4612fa8887c340fbb716fade2c8f4da394d
 
 * **Framework**: .NET 10.0 (Console Application)
 * **Torrents & Streaming**: [MonoTorrent](https://github.com/alanmcgovern/monotorrent/tree/master) 3.0.2
@@ -22,7 +30,11 @@ Um gerenciador de downloads via terminal rápido e eficiente construído em C# .
 * **Vídeos & Áudio**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (via execução direta de processo) + [Xabe.FFmpeg.Downloader](https://github.com/tomaszzmuda/Xabe.FFmpeg.Downloader)
 * **Injeção de Dependência / Localização / Logging**: `Microsoft.Extensions.DependencyInjection`, `Microsoft.Extensions.Localization`, `Microsoft.Extensions.Logging`
 
+<<<<<<< HEAD
 ## ∟ Pré-requisitos
+=======
+## 📦 Pré-requisitos
+>>>>>>> 7dafd4612fa8887c340fbb716fade2c8f4da394d
 
 Para rodar o projeto, basta ter instalado:
 
@@ -30,7 +42,11 @@ Para rodar o projeto, basta ter instalado:
 
 > **Dependências automáticas:** o `yt-dlp` e o `ffmpeg` são baixados automaticamente pelo aplicativo quando necessário. O streaming usa o **LibVLCSharp** (binários nativos restaurados pelo pacote `VideoLAN.LibVLC.Windows`), que reproduz a mídia sem exigir o VLC instalado no sistema.
 
+<<<<<<< HEAD
 ## ∟ Configuração
+=======
+## ⚙️ Configuração
+>>>>>>> 7dafd4612fa8887c340fbb716fade2c8f4da394d
 
 As configurações ficam em `Constantes/AppSettings.cs` (injetadas via DI). Destaques:
 
@@ -42,7 +58,11 @@ As configurações ficam em `Constantes/AppSettings.cs` (injetadas via DI). Dest
 * `TorrentLimiteDownload` / `TorrentLimiteUpload` — limites de banda em bytes/s (0 = ilimitado).
 * `TorrentTrackers` — trackers extras para magnet links sem DHT.
 
+<<<<<<< HEAD
 ## ∟ Estrutura do Projeto
+=======
+## 📁 Estrutura do Projeto
+>>>>>>> 7dafd4612fa8887c340fbb716fade2c8f4da394d
 
 ```text
 VideoDownloader/
@@ -59,7 +79,11 @@ VideoDownloader/
 └── VideoDownloader.slnx    # Novo formato de solução do Visual Studio
 ```
 
+<<<<<<< HEAD
 ## ∟ Como Executar o Projeto
+=======
+## 🔧 Como Executar o Projeto
+>>>>>>> 7dafd4612fa8887c340fbb716fade2c8f4da394d
 
 1. Clone o repositório:
    ```bash
@@ -74,7 +98,11 @@ VideoDownloader/
    dotnet run -- [comando] [argumentos]
    ```
 
+<<<<<<< HEAD
 ## ∟ Como Usar
+=======
+## 📖 Como Usar
+>>>>>>> 7dafd4612fa8887c340fbb716fade2c8f4da394d
 
 A sintaxe base para execução é:
 ```bash
