@@ -131,6 +131,9 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         var pastaDownload = Path.Combine(Directory.GetCurrentDirectory(), AppContext.PastaDownloads ?? "Downloads");
         Directory.CreateDirectory(pastaDownload);
 
+        MonoTorrent.Streaming.IHttpStream? stream = null;
+        System.Diagnostics.Process? player = null;
+
         try
         {
             TorrentSettings settingsBuilder = TorrentsConfig(AppContext);
@@ -145,15 +148,13 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
             await EventoHandler(cts, cancellationToken).ConfigureAwait(false);
 
-            // Cria o stream HTTP sequencial (o Player WPF reproduz a URL retornada).
-            // O stream permanece vivo enquanto o Player está aberto (using var).
             var maiorArquivo = manager.Files.OrderBy(t => t.Length).Last();
-            using var stream = await manager.StreamProvider!.CreateHttpStreamAsync(maiorArquivo, true, cancellationToken).ConfigureAwait(false);
+
+            stream = await manager.StreamProvider!.CreateHttpStreamAsync(maiorArquivo, true, cancellationToken).ConfigureAwait(false);
 
             var playerExe = Path.Combine(System.AppContext.BaseDirectory, "VideoDownloader.Player.exe");
             if (!File.Exists(playerExe))
             {
-                // Fallback: diretório de trabalho atual (ex.: build manual separado).
                 playerExe = Path.Combine(Directory.GetCurrentDirectory(), "VideoDownloader.Player.exe");
             }
 
@@ -163,25 +164,30 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             }
 
             Console.WriteLine($"Streaming pronto: {stream.FullUri}");
-            using var player = Process.Start(new ProcessStartInfo
+
+            // Inicia o player WPF passando a URL do servidor HTTP local do MonoTorrent
+            player = Process.Start(new ProcessStartInfo
             {
                 FileName = playerExe,
                 Arguments = $"\"{stream.FullUri}\"",
                 UseShellExecute = true,
             });
 
-            // Exibe os eventos do manager enquanto o Player está aberto.
+            // O loop mantém o método (e o try/catch) vivo enquanto o player assiste ao vídeo
             if (player is not null)
             {
                 while (!player.HasExited)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     ExibirLogs();
                     foreach (var (_, nome, estado, seeds, peers) in EstadoDosTorrents())
                     {
-                        // [[ ]] = colchetes literais; nome escapado para markup seguro.
                         string nomeEscape = Markup.Escape(nome);
                         AnsiConsole.MarkupLine($"[[{nomeEscape}]] [cyan]{estado}[/] | seeds: {seeds} | peers: {peers}");
                     }
+
+                    // Aguarda 1 segundo antes da próxima atualização de logs do Torrent
                     await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
                 }
             }
@@ -197,7 +203,17 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             Console.WriteLine(Localizer["Torrent_ErroAoBaixar", ex.Message]);
             throw;
         }
+        finally
+        {
+            // Quando o player fechar (ou ocorrer um erro), encerra o servidor HTTP com segurança
+            if (stream != null)
+            {
+                Console.WriteLine("Fechando o servidor de streaming HTTP local...");
+                stream.Dispose();
+            }
 
+            player?.Dispose();
+        }
     }
     private async Task EventoHandler(CancellationTokenSource cts, CancellationToken token)
     {
@@ -238,8 +254,10 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 }
             };
             await manager.StartAsync().ConfigureAwait(false);
-            if (!manager.HasMetadata) Console.WriteLine($"{manager.Name} - aguardando metadados!");
-            await manager.WaitForMetadataAsync(token).ConfigureAwait(false);
+            await manager.DhtAnnounceAsync().ConfigureAwait(false);
+            await manager.LocalPeerAnnounceAsync().ConfigureAwait(false);
+            //if (!manager.HasMetadata) Console.WriteLine($"{manager.Name} - aguardando metadados!");
+            //await manager.WaitForMetadataAsync(token).ConfigureAwait(false);
         }
     }
     private async Task MainLoop(CancellationTokenSource cts, CancellationToken token, IProgress<double>? progress)
