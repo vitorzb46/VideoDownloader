@@ -7,7 +7,7 @@
         Background="Black">
     <Grid>
         <vlc:VideoView x:Name="VideoView" IsHitTestVisible="False" />
-        // Esucudo invisivel para capturar o mouse
+        
         <Rectangle Fill="Transparent" 
                HorizontalAlignment="Stretch" 
                VerticalAlignment="Stretch" 

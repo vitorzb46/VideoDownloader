@@ -196,9 +196,21 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
 
         var spuTracks = _mediaPlayer.SpuDescription ?? [];
         SubtitleTracks.Clear();
-        foreach (var t in spuTracks.Where(t => t.Id >= 0))
+
+        var legendasProcessadas = spuTracks
+            .Where(t => t.Id >= 0 && !string.IsNullOrWhiteSpace(t.Name)) // Ignora faixas corrompidas ou nulas
+            .Select(t => new TrackItem(t.Id, NomeDaFaixa(t.Name, "Legenda", t.Id)))
+            .GroupBy(t => t.Name) // Remove legendas duplicadas com nomes idênticos no contêiner do torrent
+            .Select(g => g.First())
+            .OrderByDescending(t => t.Name.Contains("Português")) // Joga Português para o topo do ContextMenu
+            .ThenByDescending(t => t.Name.Contains("Inglês"))     // Joga Inglês em segundo
+            .ThenBy(t => t.Name);
+
+        SubtitleTracks.Add(new TrackItem(-1, "❌ Desativar Legendas"));
+
+        foreach (var item in legendasProcessadas)
         {
-            SubtitleTracks.Add(new TrackItem(t.Id, NomeDaFaixa(t.Name, "Legenda", t.Id)));
+            SubtitleTracks.Add(item);
         }
 
         IsLoading = false;
@@ -261,6 +273,14 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
             return "Japonês";
         }
 
+        foreach (var idioma in Idiomas)
+        {
+            if (limpo.Contains(idioma.Key))
+            {
+                return idioma.Value;
+            }
+        }
+
         // Se for o padrão "Track N" do VLC sem metadados, deixa descritivo
         if (limpo.StartsWith("track", StringComparison.OrdinalIgnoreCase))
         {
@@ -320,17 +340,32 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         _disposed = true;
         Log("Dispose do ViewModel iniciado");
 
+        // Remove imediatamente as inscrições de eventos para evitar callbacks fantasmas
         _mediaPlayer.PositionChanged -= OnPositionChanged;
         _mediaPlayer.Playing -= OnPlaying;
         _mediaPlayer.Paused -= OnPaused;
         _mediaPlayer.Stopped -= OnStopped;
         _mediaPlayer.EndReached -= OnEndReached;
 
-        _mediaPlayer.Stop();
-        _media?.Dispose();
-        _media = null;
-        _mediaPlayer.Dispose();
-        _libVLC.Dispose();
+        try
+        {
+            if (_mediaPlayer.IsPlaying)
+            {
+                _mediaPlayer.Stop();
+            }
+
+            _media?.Dispose();
+            _media = null;
+
+            // Descarta o MediaPlayer e depois a instância do LibVLC
+            _mediaPlayer.Dispose();
+            _libVLC.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Log($"Erro durante o dispose nativo do VLC: {ex.Message}");
+        }
+
         Log("Dispose do ViewModel concluído");
     }
 }

@@ -1,46 +1,170 @@
-<Window x:Class="VideoDownloader.Player.ControlsWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Controls" Width="1280" Height="110"
+<Window x:Class="VideoDownloader.Player.ControlsWindow" 
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+        xmlns:player="clr-namespace:VideoDownloader.Player" 
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        Title="Controls" Width="1280" Height="100"
         WindowStyle="None" ResizeMode="NoResize"
         ShowInTaskbar="False" Topmost="True"
         AllowsTransparency="True" Background="Transparent"
         MouseMove="Window_MouseMove">
 
-    <Border Background="#CC000000" BorderBrush="#333333" BorderThickness="1" HorizontalAlignment="Stretch">
-        <Grid Margin="24,8">
+    <!-- Estilo local para deixar todos os botões do player minimalistas e sem bordas quadradas chatas -->
+    <Window.Resources>
+        <Style TargetType="Separator">
+            <Setter Property="Background" Value="#2D323F"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <!-- Cria uma linha pura que ignora as margens de ícone do Windows -->
+                        <Rectangle Height="1" Fill="{TemplateBinding Background}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 1. Estilo para os itens de dentro do Menu (Áudio e Legenda) -->
+        <Style x:Key="DarkMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10, 6"/>
+            <Style.Triggers>
+                <!-- Altera a cor de fundo quando o mouse passa por cima de uma opção -->
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3D4457"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 2. Estilo Escuro para o Menu Suspenso (ContextMenu) que desativa a coluna de ícones -->
+        <Style x:Key="DarkContextMenuStyle" TargetType="ContextMenu">
+            <Setter Property="Background" Value="#F51A1E24"/>
+            <Setter Property="BorderBrush" Value="#2D323F"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <!-- Remove o layout padrão do Windows e cria uma caixa limpa livre de faixas brancas -->
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6">
+                            <ScrollViewer Margin="0">
+                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 3. Estilo minimalista para os botões do player -->
+        <Style x:Key="PlayerButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Static ToolBar.ButtonStyleKey}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+        
+    </Window.Resources>
+
+    <!-- Barra Principal Flutuante -->
+    <Border Background="#E61A1E24" BorderBrush="#2D323F" BorderThickness="1" 
+            HorizontalAlignment="Center" VerticalAlignment="Center" 
+            CornerRadius="8" Height="75" Width="1100">
+
+        <Grid Margin="20,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Linha do tempo -->
-            <Slider x:Name="TimelineSlider" Grid.Row="0" Minimum="0" Maximum="100" Value="{Binding Position, Mode=TwoWay}" PreviewMouseDown="TimelineSlider_PreviewMouseDown" PreviewMouseUp="TimelineSlider_PreviewMouseUp" />
+            <!-- Linha do Tempo (Slider Superior) -->
+            <Slider x:Name="TimelineSlider" Grid.Row="0" Minimum="0" Maximum="100" 
+                    Value="{Binding Position, Mode=TwoWay}" 
+                    Margin="0,-4,0,0" Height="12" VerticalAlignment="Top" Background="Transparent"
+                    PreviewMouseDown="TimelineSlider_PreviewMouseDown" PreviewMouseUp="TimelineSlider_PreviewMouseUp" />
 
-            <!-- Botões + volume -->
-            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
-                <Button x:Name="PlayPauseButton" Content="▶ / ⏸" Click="PlayPauseButton_Click" Width="100" Height="32" Background="#222222" Foreground="White" BorderBrush="#444444" FontWeight="Bold" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
-                <Button Content="🔲 Tela Cheia" Click="FullscreenButton_Click" Width="110" Height="32" Margin="15,0,0,0" Background="#222222" Foreground="White" BorderBrush="#444444" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
-                <TextBlock Text="🔊 Volume:" Foreground="White" VerticalAlignment="Center" Margin="20,0,6,0" />
-                <Slider x:Name="VolumeSlider" Width="140" Minimum="0" Maximum="100" VerticalAlignment="Center" Value="{Binding Volume, Mode=TwoWay}" />
-            </StackPanel>
-
-            <!-- Seleção de áudio e legendas -->
-            <Grid Grid.Row="2" Margin="0,8,0,0">
+            <!-- Barra de Ferramentas Distribuída -->
+            <Grid Grid.Row="1" VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Áudio:" Foreground="White" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <ComboBox x:Name="AudioCombo" Grid.Column="1" Width="160" ItemsSource="{Binding AudioTracks}" DisplayMemberPath="Name" SelectionChanged="AudioCombo_SelectionChanged" />
-                <TextBlock Text="Legenda:" Grid.Column="2" Foreground="White" VerticalAlignment="Center" Margin="16,0,6,0" />
-                <ComboBox x:Name="SubtitleCombo" Grid.Column="3" Width="160" ItemsSource="{Binding SubtitleTracks}" DisplayMemberPath="Name" SelectionChanged="SubtitleCombo_SelectionChanged" />
-                <Button Grid.Column="4" Content="Carregar Legenda (.srt)" HorizontalAlignment="Right" Click="LoadSubtitleButton_Click" Margin="10,0,10,0" Background="#222222" Foreground="White" BorderBrush="#444444" FontWeight="Bold" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}"/>
+
+                <!-- BLOCO ESQUERDO: Reprodução e Controle de Tempo -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="⏪" Style="{StaticResource PlayerButtonStyle}" FontSize="13" ToolTip="Voltar 10s"/>
+                    <Button x:Name="PlayPauseButton" Content="▶" Click="PlayPauseButton_Click" Style="{StaticResource PlayerButtonStyle}" FontSize="18" ToolTip="Reproduzir / Pausar"/>
+                    <Button Content="⏩" Style="{StaticResource PlayerButtonStyle}" FontSize="13" ToolTip="Avançar 10s"/>
+                    <Button Content="🔊" Style="{StaticResource PlayerButtonStyle}" Width="35" ToolTip="Mutar"/>
+                    <Slider x:Name="VolumeSlider" Width="100" Minimum="0" Maximum="100" 
+                            VerticalAlignment="Center" Margin="5,0,0,0"
+                            Value="{Binding Volume, Mode=TwoWay}" />
+                </StackPanel>
+
+                <!-- BLOCO DIREITO: Configurações e Funções de Arquivo -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="📁" Click="LoadSubtitleButton_Click" Style="{StaticResource PlayerButtonStyle}" FontSize="16" ToolTip="Carregar Legenda ou Arquivo (.srt / .torrent)"/>
+
+                    <!-- Botão de Configurações com Menu Suspenso acoplado -->
+                    <Button Content="⚙" Style="{StaticResource PlayerButtonStyle}" ToolTip="Áudio, Legendas e Ajustes" Click="SettingsButton_Click">
+                        <Button.ContextMenu>
+                            <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
+                                <!-- Aplicamos os estilos diretamente nos submenus e forçamos a MaxHeight neles para conter as 30+ legendas -->
+                                <MenuItem Header="🗣 Idioma do Áudio" 
+                                      Style="{StaticResource DarkMenuItemStyle}"
+                                      ItemContainerStyle="{StaticResource DarkMenuItemStyle}"
+                                      ItemsSource="{Binding AudioTracks}" 
+                                      DisplayMemberPath="Name"
+                                      ButtonBase.Click="AudioMenuItem_Click">
+                                    <MenuItem.Resources>
+                                        <!-- Truque XAML: Força a remoção da barra de ícones de todos os subitens -->
+                                        <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}">
+                                            <Setter Property="MaxHeight" Value="250"/>
+                                        </Style>
+                                    </MenuItem.Resources>
+                                </MenuItem>
+
+                                <MenuItem Header="💬 Legendas" 
+                                      Style="{StaticResource DarkMenuItemStyle}"
+                                      ItemContainerStyle="{StaticResource DarkMenuItemStyle}"
+                                      ItemsSource="{Binding SubtitleTracks}" 
+                                      DisplayMemberPath="Name"
+                                      ButtonBase.Click="SubtitleMenuItem_Click">
+                                    <MenuItem.Resources>
+                                        <!-- Limita a altura do popup de legendas e remove a faixa branca interna -->
+                                        <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}">
+                                            <Setter Property="MaxHeight" Value="250"/>
+                                        </Style>
+                                    </MenuItem.Resources>
+                                </MenuItem>
+
+                                <Separator Margin="0,4">
+                                    <Separator.Template>
+                                        <ControlTemplate TargetType="Separator">
+                                            <!-- Cria um retângulo fino que ignora as margens de ícones e encosta nas duas bordas -->
+                                            <Rectangle Height="1" Fill="#2D323F" HorizontalAlignment="Stretch"/>
+                                        </ControlTemplate>
+                                    </Separator.Template>
+                                </Separator>
+                                
+                                <MenuItem Header="ℹ Informações do Torrent" Style="{StaticResource DarkMenuItemStyle}" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+
+                    <Button Content="⛶" Click="FullscreenButton_Click" Style="{StaticResource PlayerButtonStyle}" FontSize="18" ToolTip="Tela Cheia"/>
+                </StackPanel>
             </Grid>
+
         </Grid>
     </Border>
 </Window>

@@ -1,9 +1,10 @@
+using Microsoft.Win32;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
-using Microsoft.Win32;
 
 namespace VideoDownloader.Player;
 
@@ -13,8 +14,17 @@ public partial class ControlsWindow : Window
     private readonly PlayerViewModel _viewModel;
     private bool _isSeeking;
 
-    /// <summary>Dispara quando o usuário pede alternar tela cheia (a janela de vídeo executa).</summary>
+    /// <summary>Dispara quando o usuário alternar tela cheia (a janela de vídeo executa).</summary>
     public event EventHandler? FullscreenRequested;
+    /// <summary>Dispara quando há movimento do mouse sobre os controles (modo cinema).</summary>
+    public event EventHandler? ActivityDetected;    
+
+    public ControlsWindow(PlayerViewModel viewModel)
+    {
+        InitializeComponent();
+        _viewModel = viewModel;
+        DataContext = viewModel;
+    }
 
     private static void Log(string mensagem)
     {
@@ -23,13 +33,6 @@ public partial class ControlsWindow : Window
             File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {mensagem}{Environment.NewLine}");
         }
         catch { /* log é best-effort */ }
-    }
-
-    public ControlsWindow(PlayerViewModel viewModel)
-    {
-        InitializeComponent();
-        _viewModel = viewModel;
-        DataContext = viewModel;
     }
 
     // --- Timeline (proteção contra loop) ---
@@ -44,21 +47,25 @@ public partial class ControlsWindow : Window
         _viewModel.SeekTo(TimelineSlider.Value);
     }
 
-    // --- Áudio / Legendas ---
-    private void AudioCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    // --- Manipulador de clique para os sub-itens do menu de Áudio ---
+    private void AudioMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (AudioCombo.SelectedItem is TrackItem track)
+        if (e.OriginalSource is MenuItem menuItem && menuItem.DataContext is TrackItem track)
         {
-            Log($"AudioCombo: faixa {track.Id} ({track.Name})");
-            _viewModel.SelectAudioTrack(track.Id);
+            Log($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})");
+            _viewModel.SelectSubtitleTrack(track.Id);
+
+            // FECHAMENTO AUTOMÁTICO: Localiza o menu pai e fecha
+            FecharMenuConfiguracoes(menuItem);
         }
     }
 
-    private void SubtitleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    // --- Manipulador de clique para os sub-itens do menu de Legendas ---
+    private void SubtitleMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (SubtitleCombo.SelectedItem is TrackItem track)
+        if (e.OriginalSource is MenuItem menuItem && menuItem.DataContext is TrackItem track)
         {
-            Log($"SubtitleCombo: faixa {track.Id} ({track.Name})");
+            Log($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})");
             _viewModel.SelectSubtitleTrack(track.Id);
         }
     }
@@ -67,7 +74,7 @@ public partial class ControlsWindow : Window
     private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.TogglePlay();
-        PlayPauseButton.Content = _viewModel.IsPlaying ? "Pausar" : "Play";
+        PlayPauseButton.Content = _viewModel.IsPlaying ? "⏸" : "▶";
     }
 
     private void FullscreenButton_Click(object sender, RoutedEventArgs e)
@@ -100,6 +107,36 @@ public partial class ControlsWindow : Window
         }
     }
 
-    /// <summary>Dispara quando há movimento do mouse sobre os controles (modo cinema).</summary>
-    public event EventHandler? ActivityDetected;
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.ContextMenu != null)
+        {
+            btn.ContextMenu.PlacementTarget = btn;
+            btn.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            btn.ContextMenu.HorizontalOffset = -120;
+            btn.ContextMenu.VerticalOffset = -25;
+            btn.ContextMenu.IsOpen = true;
+        }
+    }
+
+    /// <summary>
+    /// Método auxiliar para encontrar o ContextMenu ancestral e fechá-lo de forma segura.
+    /// </summary>
+    private void FecharMenuConfiguracoes(DependencyObject elemento)
+    {
+        var atual = elemento;
+
+        // Sobe na árvore de elementos até encontrar o ContextMenu pai
+        while (atual != null && atual is not System.Windows.Controls.ContextMenu)
+        {
+            // Tenta pegar o pai lógico ou o pai visual usando um cast seguro
+            atual = (atual as FrameworkElement)?.Parent ?? System.Windows.Media.VisualTreeHelper.GetParent(atual);
+        }
+
+        // Se encontrou o menu, fecha ele imediatamente
+        if (atual is ContextMenu menu)
+        {
+            menu.IsOpen = false;
+        }
+    }
 }

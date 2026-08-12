@@ -54,6 +54,11 @@ public partial class PlayerWindow : Window
             Log("Loaded disparado — posicionando controles");
             // Owner garante que a janela de controles fique sempre à frente do player.
             _controls.Owner = this;
+
+            // --- RESOLUÇÃO DO BUG DO MENU FLUTUANTE (Foco do Windows) ---
+            this.Activated += (s, e) => _controls.Topmost = true;
+            this.Deactivated += (s, e) => _controls.Topmost = false;
+
             PosicionarControles();
             _controls.Show();
         };
@@ -80,6 +85,7 @@ public partial class PlayerWindow : Window
             _inactivityTimer.Stop();
             _controls.Close();
             _viewModel.Dispose();
+            Environment.Exit(0);
         };
 
         // Sincroniza a janela de controles com a janela de vídeo.
@@ -96,7 +102,10 @@ public partial class PlayerWindow : Window
         var media = new Media(_viewModel.LibVLC, mediaUrl, FromType.FromLocation);
 
         // Opções de rede para streaming (buffering + sync) — essencial para URL/stream.
-        media.AddOption(":network-caching=2000");
+        media.AddOption(":network-caching=3000");
+        media.AddOption(":file-caching=3000");
+        media.AddOption(":live-caching=3000");
+        media.AddOption(":skip-frames");
         media.AddOption(":clock-synchro=0");
         media.AddOption(":clock-jitter=5000");
 
@@ -112,11 +121,19 @@ public partial class PlayerWindow : Window
     {
         if (_controls is null) return;
 
+        // Se estiver em modo cinema, usamos a matemática baseada na tela cheia
         if (_viewModel.IsFullscreen)
         {
             _controls.Width = SystemParameters.PrimaryScreenWidth;
             _controls.Left = 0; // Zera a propriedade esquerda permanentemente na tela cheia
             _controls.Top = SystemParameters.PrimaryScreenHeight - _controls.Height;
+        } 
+        // Janela Maximizada (Botão maximizar do windows (do player))
+        else if (this.WindowState == WindowState.Maximized)
+        {
+            _controls.Width = SystemParameters.WorkArea.Width;
+            _controls.Left = SystemParameters.WorkArea.Left;
+            _controls.Top = SystemParameters.WorkArea.Bottom - _controls.Height;
         }
         // Se estiver em modo janela normal, usamos a matemática baseada no Player (this)
         else
@@ -142,10 +159,15 @@ public partial class PlayerWindow : Window
     {
         _controls.Visibility = Visibility.Visible;
         Mouse.OverrideCursor = Cursors.Arrow;
+
+        _inactivityTimer.Stop();
+        _inactivityTimer.Start();
     }
 
     private void HideControls()
     {
+        _inactivityTimer.Stop();
+
         if (_viewModel.IsFullscreen)
         {
             _controls.Visibility = Visibility.Collapsed;
