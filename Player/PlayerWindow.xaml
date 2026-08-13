@@ -4,14 +4,39 @@
         xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
         Title="Torrent Player" Width="1280" Height="720"
         WindowStartupLocation="CenterScreen"
-        Background="Black">
+        Background="Black"
+        MouseMove="Player_Mouse">
+
     <Grid>
-        <vlc:VideoView x:Name="VideoView" IsHitTestVisible="False" />
-        
-        <Rectangle Fill="Transparent" 
-               HorizontalAlignment="Stretch" 
-               VerticalAlignment="Stretch" 
-               MouseMove="Player_Mouse" /> 
+
+        <Grid.Resources>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        </Grid.Resources>
+
+        <vlc:VideoView x:Name="VideoView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" MouseMove="Player_Mouse" />
+
+        <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
+          Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+
+            <Border Background="#AA000000" CornerRadius="12" Padding="24,20">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+
+                    <ProgressBar 
+                             Width="50" 
+                             Height="10" 
+                             Foreground="#2D323F" 
+                             BorderThickness="4,4,4,4" IsIndeterminate="True"/>
+
+                    <TextBlock Text="Carregando..." 
+                           Foreground="White" 
+                           FontWeight="SemiBold"
+                           FontSize="14" 
+                           Margin="5,12,0,0" 
+                           HorizontalAlignment="Center" FontFamily="Bahnschrift SemiLight"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
     </Grid>
 </Window>
 

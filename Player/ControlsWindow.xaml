@@ -7,10 +7,72 @@
         WindowStyle="None" ResizeMode="NoResize"
         ShowInTaskbar="False" Topmost="True"
         AllowsTransparency="True" Background="Transparent"
-        MouseMove="Window_MouseMove">
+        MouseMove="Window_MouseMove" SnapsToDevicePixels="True">
 
     <!-- Estilo local para deixar todos os botões do player minimalistas e sem bordas quadradas chatas -->
     <Window.Resources>
+        <!-- 1. ESTILO PERSONALIZADO PARA A BARRA DE ROLAGEM ESCURA -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="#1A1E24"/>
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="{TemplateBinding Background}">
+                            <!-- Canaleta por onde o indicador desliza -->
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.Thumb>
+                                    <!-- O indicador que você arrasta com o mouse -->
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <!-- Cor do indicador: #4E5566 (Cinza Escuro) -->
+                                                <Border Background="#4E5566" CornerRadius="4" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 2. TEMPLATE DO ITEM DE MENU (CORRIGIDO E COM SCROLL ATIVADO) -->
+        <ControlTemplate x:Key="LimpaBordaMenuItemTemplate" TargetType="MenuItem">
+            <Grid>
+                <Border x:Name="Border"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="0,0,0,1" 
+                    Padding="{TemplateBinding Padding}">
+                    <Grid>
+                        <ContentPresenter ContentSource="Header" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="Arrow" Text="▶" Foreground="White" FontSize="10" 
+                               HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+
+                <Popup x:Name="SubMenuPopup" Placement="Right" IsOpen="{TemplateBinding IsSubmenuOpen}" Focusable="False" PopupAnimation="Fade">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
+                        <!-- O ScrollViewer herda automaticamente o estilo de ScrollBar definido acima -->
+                        <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsPresenter Grid.IsSharedSizeScope="True"/>
+                        </ScrollViewer>
+                    </Border>
+                </Popup>
+            </Grid>
+
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#2D323F"/>
+                </Trigger>
+                <Trigger Property="HasItems" Value="True">
+                    <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
         <Style TargetType="Separator">
             <Setter Property="Background" Value="#2D323F"/>
             <Setter Property="Margin" Value="0,4,0,4"/>
@@ -23,24 +85,11 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <!-- 1. Estilo para os itens de dentro do Menu (Áudio e Legenda) -->
-        <Style x:Key="DarkMenuItemStyle" TargetType="MenuItem">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="10, 6"/>
-            <Style.Triggers>
-                <!-- Altera a cor de fundo quando o mouse passa por cima de uma opção -->
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#3D4457"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- 2. Estilo Escuro para o Menu Suspenso (ContextMenu) que desativa a coluna de ícones -->
+        <!-- Estilo Escuro para o Menu Suspenso (ContextMenu) que desativa a coluna de ícones -->
         <Style x:Key="DarkContextMenuStyle" TargetType="ContextMenu">
-            <Setter Property="Background" Value="#F51A1E24"/>
-            <Setter Property="BorderBrush" Value="#2D323F"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#2D323F"/>
+            <Setter Property="Background" Value="#F51A1E24"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
@@ -49,9 +98,9 @@
                     <!-- Remove o layout padrão do Windows e cria uma caixa limpa livre de faixas brancas -->
                     <ControlTemplate TargetType="ContextMenu">
                         <Border Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6">
+            BorderBrush="{TemplateBinding BorderBrush}"
+            BorderThickness="{TemplateBinding BorderThickness}"
+            CornerRadius="6">
                             <ScrollViewer Margin="0">
                                 <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
                             </ScrollViewer>
@@ -60,8 +109,16 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <!-- 3. Estilo minimalista para os botões do player -->
+        <!-- Estilo para os itens de dentro do Menu (Áudio e Legenda) -->
+        <Style x:Key="DarkMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="12, 6"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#2D323F"/>
+            <Setter Property="Background" Value="#F51A1E24"/>
+            <Setter Property="Template" Value="{StaticResource LimpaBordaMenuItemTemplate}"/>
+        </Style>        
+        <!-- Estilo minimalista para os botões do player -->
         <Style x:Key="PlayerButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Static ToolBar.ButtonStyleKey}}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="White"/>
@@ -119,30 +176,30 @@
                         <Button.ContextMenu>
                             <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
                                 <!-- Aplicamos os estilos diretamente nos submenus e forçamos a MaxHeight neles para conter as 30+ legendas -->
-                                <MenuItem Header="🗣 Idioma do Áudio" 
+                                <MenuItem
+                                      Header="🗣 Idioma do Áudio" 
                                       Style="{StaticResource DarkMenuItemStyle}"
                                       ItemContainerStyle="{StaticResource DarkMenuItemStyle}"
                                       ItemsSource="{Binding AudioTracks}" 
                                       DisplayMemberPath="Name"
                                       ButtonBase.Click="AudioMenuItem_Click">
                                     <MenuItem.Resources>
-                                        <!-- Truque XAML: Força a remoção da barra de ícones de todos os subitens -->
-                                        <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}">
-                                            <Setter Property="MaxHeight" Value="250"/>
+                                        <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}">                                            
+                                            <Setter Property="MaxHeight" Value="150"/>
                                         </Style>
                                     </MenuItem.Resources>
                                 </MenuItem>
 
-                                <MenuItem Header="💬 Legendas" 
+                                <MenuItem
+                                      Header="💬 Legendas" 
                                       Style="{StaticResource DarkMenuItemStyle}"
                                       ItemContainerStyle="{StaticResource DarkMenuItemStyle}"
                                       ItemsSource="{Binding SubtitleTracks}" 
                                       DisplayMemberPath="Name"
                                       ButtonBase.Click="SubtitleMenuItem_Click">
                                     <MenuItem.Resources>
-                                        <!-- Limita a altura do popup de legendas e remove a faixa branca interna -->
                                         <Style TargetType="ContextMenu" BasedOn="{StaticResource DarkContextMenuStyle}">
-                                            <Setter Property="MaxHeight" Value="250"/>
+                                            <Setter Property="MaxHeight" Value="150"/>
                                         </Style>
                                     </MenuItem.Resources>
                                 </MenuItem>

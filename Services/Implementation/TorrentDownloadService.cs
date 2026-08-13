@@ -24,14 +24,13 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 {
     private readonly AppSettings AppContext = appContext;
     private ClientEngine Engine { get; set; } = engine;
-    private Log Log { get; set; } = new();
-    private StringBuilder SB { get; } = new(1024);    
+    private Log Log { get; set; } = new(); 
     private static int LinhaInicialDeLogs { get; set; }
     private IStringLocalizer<TorrentDownloadService> Localizer { get; } = localizer;
     private string Verde { get; } = "[green]";
     private string Vermelho { get; } = "[red]";
     private string Amarelo { get; } = "[yellow]";
-    private readonly Dictionary<Guid, TorrentManager> _torrents = [];
+    private static readonly Dictionary<Guid, TorrentManager> _torrents = [];
     private string CliAtual { get; set; } = string.Empty;
     /// <summary>
     /// Baixa todos os arquivos torrents da pasta informada.
@@ -56,7 +55,8 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
             if (managers.Count == 0)
             {
-                Console.WriteLine(Localizer["Torrent_NenhumEncontrado", pastaTorrents]);
+                Log.Adicionar(Localizer["Torrent_NenhumEncontrado", pastaTorrents], true);
+                Log.Exibir();
                 return id;
             }
 
@@ -71,7 +71,8 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         }
         catch (Exception ex)
         {
-            Console.WriteLine(Localizer["Torrent_ErroAoBaixar", ex.Message]);
+            Log.Adicionar(Localizer["Torrent_ErroAoBaixar", ex.Message], true);
+            Log.Exibir();
             throw;
         }
 
@@ -165,6 +166,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         catch (Exception ex)
         {
             Log.Adicionar(Localizer["Torrent_ErroAoBaixar", ex.Message]);
+            Log.Exibir();
             throw;
         }
         finally
@@ -172,7 +174,8 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             // Quando o player fechar (ou ocorrer um erro), encerra o servidor HTTP com segurança
             if (stream != null)
             {
-                Log.Adicionar("Fechando o servidor de streaming HTTP local...");
+                Log.Adicionar("[red]Fechando o servidor de streaming HTTP local...[/]");
+                Log.Exibir();
                 stream.Dispose();
             }
 
@@ -188,27 +191,27 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             {
                 if (e.NewPeers == 0) return;
                 string peers = $"[cyan]{e.NewPeers}[/]";
-                Log.Adicionar(Localizer["Torrent_PeersEncontrados", e.GetType().Name, peers, nomeEscapado]);
+                Log.Adicionar(Localizer["Torrent_PeersEncontrados", e.GetType().Name, peers, nomeEscapado], true);
             };
             manager.PeerConnected += (o, e) =>
             {
-                Log.Adicionar(Localizer["Torrent_ConexaoSucesso", Markup.Escape(e.Peer.Uri.ToString())]);
+                Log.Adicionar(Localizer["Torrent_ConexaoSucesso", Markup.Escape(e.Peer.Uri.ToString())], true);
             };
             manager.ConnectionAttemptFailed += (o, e) =>
             {
-                Log.Adicionar(Localizer["Torrent_ConexaoFalha", Markup.Escape(e.Peer.ConnectionUri.ToString())]);
+                Log.Adicionar(Localizer["Torrent_ConexaoFalha", Markup.Escape(e.Peer.ConnectionUri.ToString())], true);
             };
             manager.TorrentStateChanged += async (o, e) =>
             {
-                Log.Adicionar(Localizer["Torrent_StatusMudanca", nomeEscapado, e.NewState]);
+                Log.Adicionar(Localizer["Torrent_StatusMudanca", nomeEscapado, e.NewState], true);
                 if (e.NewState == TorrentState.Error)
                 {
-                    Log.Adicionar(Localizer["Torrent_ErroInterno"]);
+                    Log.Adicionar(Localizer["Torrent_ErroInterno"], true);
                     await e.TorrentManager.StopAsync().ConfigureAwait(false);
                 }
                 if (e.NewState == TorrentState.Seeding)
                 {
-                    Log.Adicionar(Localizer["Torrent_Sucesso", nomeEscapado]);
+                    Log.Adicionar(Localizer["Torrent_Sucesso", nomeEscapado], true);
                     // Seeding controlado por config: se TorrentSemear=false, para ao concluir;
                     // se true, mantém o manager semeando para ajudar a comunidade.
                     if (!AppContext.TorrentSemear)
@@ -217,11 +220,10 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                     }
                 }
             };
+            
             await manager.StartAsync().ConfigureAwait(false);
             await manager.DhtAnnounceAsync().ConfigureAwait(false);
-            await manager.LocalPeerAnnounceAsync().ConfigureAwait(false);
-            //if (!manager.HasMetadata) Console.WriteLine($"{manager.Name} - aguardando metadados!");
-            //await manager.WaitForMetadataAsync(token).ConfigureAwait(false);
+            await manager.LocalPeerAnnounceAsync().ConfigureAwait(false);            
         }
     }
     private async Task MainLoop(CancellationTokenSource cts, CancellationToken token, IProgress<double>? progress)
@@ -240,7 +242,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         Console.CancelKeyPress += (sender, eventArgs) =>
         {
             eventArgs.Cancel = true;
-            Console.WriteLine("Ctrl+C pressionado, encerrando...");
+            Log.Adicionar("Ctrl+C pressionado, encerrando...", true);
             cts.Cancel();
         };
 
@@ -259,17 +261,17 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 break;
             }
 
-            SB.Clear();
+            Log.Limpar();
 
             string headerFormat = $" [cyan]{_torrents.Count} torrent(s) ativo(s) | ↓ {FormatarBytes(Engine.TotalDownloadRate)}/s | ↑ {FormatarBytes(Engine.TotalUploadRate)}/s[/]".PadRight(110);
 
             // CLI Torrents
-            SB.AppendLine(CultureInfo.InvariantCulture, $"[cyan]{Multi(110, '=')}[/]");
-            SB.AppendLine(headerFormat);
-            SB.AppendLine();
-            SB.AppendLine("  [[Q]] Abortar todos | [[A]] Abortar por id | Ctrl+C para sair");
-            SB.AppendLine(" >: ");
-            SB.AppendLine(CultureInfo.InvariantCulture, $"[cyan]{Multi(110, '=')}[/]");
+            Log.Adicionar($"[cyan]{Multi(110, '=')}[/]");
+            Log.Adicionar(headerFormat);
+            Log.Adicionar("");
+            Log.Adicionar("  [[Q]] Abortar todos | [[A]] Abortar por id | Ctrl+C para sair");
+            Log.Adicionar(" >: ");
+            Log.Adicionar($"[cyan]{Multi(110, '=')}[/]");
             foreach (var (id, _) in _torrents)
             {
                 var p = ObterProgresso(id);
@@ -285,19 +287,19 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 string downloadFormat = $" Download: {FormatarBytes(p.VelocidadeDownload)}/s ↓ | Upload: {FormatarBytes(p.VelocidadeUpload)}/s ↑ | Baixado: {FormatarBytes(p.BytesBaixados)} de {FormatarBytes(p.TamanhoTotal)}".PadRight(110);
                 string statusFormat = $" Status: {cor}{p.Estado}[/] | Tempo restante: {tempoEstimado} | Peers: {p.Seeds}/{p.Peers}".PadRight(110);
 
-                SB.AppendLine("");
-                SB.AppendLine(CultureInfo.InvariantCulture, $" Arquivo: [cyan]{nomeEscape}[/] [[[yellow]{id:N}[/]]]");
-                SB.AppendLine(downloadFormat);
-                SB.AppendLine(statusFormat);
-                BarraDeProgresso(progress, SB, p.Percentual, $"Progresso - {p.Percentual * 100:0.0}%");
+                Log.Adicionar("");
+                Log.Adicionar($" Arquivo: [cyan]{nomeEscape}[/] [[[yellow]{id:N}[/]]]");
+                Log.Adicionar(downloadFormat);
+                Log.Adicionar(statusFormat);
+                BarraDeProgresso(progress, Log.SB, p.Percentual, $"Progresso - {p.Percentual * 100:0.0}%");
             }
             // CLI Logs
-            SB.AppendLine(CultureInfo.InvariantCulture, $"[cyan]{Multi(110, '-')}[/]");
-            SB.AppendLine(CultureInfo.InvariantCulture, $"{Multi(30, ' ')}[cyan]=== ÚLTIMOS LOGS DO SISTEMA ===[/]");
+            Log.Adicionar($"[cyan]{Multi(110, '-')}[/]");
+            Log.Adicionar($"{Multi(30, ' ')}[cyan]=== ÚLTIMOS LOGS DO SISTEMA ===[/]");
             
             Log.Exibir();
 
-            string cliAtual = SB.ToString();
+            string cliAtual = Log.SBToString();
             if (cliAtual != CliAtual)
             {
                 Console.SetCursorPosition(0, 0);
@@ -308,8 +310,8 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                     cliAtual += new string(' ', diferenca);
                 }
 
-                AnsiConsole.Markup(cliAtual);
-                CliAtual = SB.ToString();
+                Log.MarkupLine(cliAtual);
+                CliAtual = Log.SBToString();
             }
 
             if (Console.KeyAvailable)
@@ -319,7 +321,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 {
                     cts.Cancel();
                     Console.Clear();
-                    AnsiConsole.MarkupLine($"[yellow]{Localizer["Torrent_AbortandoTodos"]}[/]");
+                    Log.Adicionar($"[yellow]{Localizer["Torrent_AbortandoTodos"]}[/]", true);
 
                     foreach (var id in _torrents.Keys.ToList())
                     {
@@ -330,10 +332,10 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 else if (tecla == ConsoleKey.A)
                 {
                     // Move o cursor para uma linha segura abaixo do painel de logs para não quebrar o layout
-                    var linhaInput = 5;
-                    Console.SetCursorPosition(5, linhaInput);
+                    //var linhaInput = 5;
+                    //Console.SetCursorPosition(5, linhaInput);
 
-                    AnsiConsole.Markup($"[yellow]{Localizer["Torrent_DigiteId"]}: [/]");
+                    Log.Adicionar($"[yellow]{Localizer["Torrent_DigiteId"]}: [/]", true);
 
                     Console.CursorVisible = true;
                     string? input = Console.ReadLine();
@@ -345,7 +347,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                     }
                     else
                     {
-                        Log.Adicionar($"[red]{Localizer["Torrent_IdInvalido"]}[/]");
+                        Log.Adicionar($"[red]{Localizer["Torrent_IdInvalido"]}[/]", true);
                     }
 
                     // Força um Clear real apenas após a leitura do input para limpar a linha escrita pelo usuário
@@ -392,12 +394,18 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             while (!player.HasExited)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                int? ultimoSeed = null;
                 foreach (var (_, nome, estado, seeds, peers) in EstadoDosTorrents())
                 {
-                    string nomeEscape = Markup.Escape(nome);
-                    AnsiConsole.MarkupLine($"[[{nomeEscape}]] [cyan]{estado}[/] | seeds: {seeds} | peers: {peers}");
-                }
-                Log.Exibir();
+                    if (ultimoSeed == null || seeds != ultimoSeed)
+                    {
+                        string nomeEscape = Markup.Escape(nome);
+                        Log.Adicionar($"[[{nomeEscape}]] [cyan]{estado}[/] | seeds: {seeds} | peers: {peers}", true);
+                        ultimoSeed = seeds;
+                    }
+                    Log.Exibir();
+                }                
                 // Aguarda 2 segundo antes da próxima atualização de logs do Torrent
                 await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
             }
@@ -414,17 +422,19 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         {
             cancellationToken.ThrowIfCancellationRequested();
             double progressoTorrent = manager.Bitfield.PercentComplete;
-            AnsiConsole.MarkupLine($"[yellow]Enchendo Buffer Inicial:[/] {progressoTorrent:0.0}% / {buffer}% | Seeds: {manager.Peers.Seeds}");
+            Log.Adicionar($"[yellow]Enchendo Buffer Inicial:[/] {progressoTorrent:0.0}% / {buffer}% | Seeds: {manager.Peers.Seeds}", true);
 
             if (progressoTorrent >= buffer)
             {
-                AnsiConsole.MarkupLine("[cyan]Buffer inicial concluído![/]");
+                Log.Adicionar("[cyan]Buffer inicial concluído![/]");
+                Log.Exibir();
                 break;
             }
+            Log.Exibir();
             await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
         }
     }
-    private async Task AtualizarFilaDeDownloadsAsync()
+    private static async Task AtualizarFilaDeDownloadsAsync()
     {
         const int LimiteMaximoDownloadsAtivos = 10;
 
@@ -441,6 +451,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             {
                 await manager.StartAsync().ConfigureAwait(false);
                 Log.Adicionar($"[green][Fila][/] Iniciando download agendado de: {manager.Name}");
+                Log.Exibir();
             }
         }
     }
@@ -470,13 +481,14 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
                 if (Path.GetExtension(torrent.Name) == ".scr")
                 {
-                    Console.WriteLine(Localizer["Torrent_AvisoCache", Path.GetFileName(arquivo)]);
+                    Log.Adicionar(Localizer["Torrent_AvisoCache", Path.GetFileName(arquivo)]);
                 }
                 else
                 {
                     lock (listaDeTorrents)
                     {
                         listaDeTorrents.Add(torrent);
+                        Log.Adicionar($"Torrent carregado: {Path.GetFileName(arquivo)}");
                     }
                 }
             }
@@ -484,13 +496,14 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             {
                 if (ex.Message.Contains("torrent", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine(Localizer["Torrent_FalhaCarregar", Path.GetFileName(arquivo)]);
+                    Log.Adicionar(Localizer["Torrent_FalhaCarregar", Path.GetFileName(arquivo)]);
                 }
                 else
                 {
-                    Console.WriteLine(Localizer["Torrent_ErroProcessar", Path.GetFileName(arquivo), ex.Message]);
+                    Log.Adicionar(Localizer["Torrent_ErroProcessar", Path.GetFileName(arquivo), ex.Message]);
                 }
             }
+            Log.Exibir();
         });
 
         await Task.WhenAll(tarefas).ConfigureAwait(false);
@@ -505,7 +518,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
         var listaDeManagers = new List<TorrentManager>();
 
-        Console.WriteLine(Localizer["Torrent_Registrando", listaDeTorrents.Count]);
+        Log.Adicionar(Localizer["Torrent_Registrando", listaDeTorrents.Count]);
 
         foreach (var torrent in listaDeTorrents)
         {
@@ -516,9 +529,10 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             }
             catch (Exception ex)
             {
-                Console.WriteLine(Localizer["Torrent_FalhaRegistrar", torrent.Name, ex.Message]);
+                Log.Adicionar(Localizer["Torrent_FalhaRegistrar", torrent.Name, ex.Message]);
             }
         }
+        Log.Exibir();
         return listaDeManagers;
     }
     private static string TempoEstimado(TorrentProgress p, double progresso)
@@ -554,12 +568,12 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             {
                 temp.Report(progresso, sb);
             }
-            sb.AppendLine();
+            Log.Adicionar();
         }
         else if (progress is ConsoleDownloadProgressBar consoleBar)
         {
             consoleBar.Report(progresso, sb);
-            sb.AppendLine();
+            Log.Adicionar();
         }
     }
     private static TorrentSettings TorrentsConfig(AppSettings app)
@@ -576,7 +590,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             MaximumUploadRate = app.TorrentLimiteUpload
         }.ToSettings();
     }
-    private TorrentProgress ObterProgresso(Guid id)
+    private static TorrentProgress ObterProgresso(Guid id)
     {
         var manager = _torrents[id];
 
@@ -584,9 +598,17 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         {
             TorrentState.Error => TorrentEstado.Erro,
             TorrentState.Seeding => TorrentEstado.Semeando,
-            TorrentState.Stopped or TorrentState.Paused => TorrentEstado.Pausado,
+            TorrentState.Stopped => TorrentEstado.Parado,
+            TorrentState.Downloading => TorrentEstado.Baixando,
+            TorrentState.Paused => TorrentEstado.Pausado,
+            TorrentState.FetchingHashes => TorrentEstado.BuscandoHashs,
+            TorrentState.Hashing => TorrentEstado.VerificandoHash,
+            TorrentState.HashingPaused => TorrentEstado.HashPausado,
+            TorrentState.Starting => TorrentEstado.Iniciando,
+            TorrentState.Stopping => TorrentEstado.Parando,
+            TorrentState.Metadata => TorrentEstado.Metadata,
             _ when manager.Progress >= 100d => TorrentEstado.Concluido,
-            _ => TorrentEstado.Baixando,
+            _ => TorrentEstado.Erro,
         };
 
         return new TorrentProgress(
@@ -613,42 +635,63 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
     /// <summary>
     /// Snapshot do estado atual dos torrents ativos (para o CLI mostrar peers/estado no streaming).
     /// </summary>
-    public IReadOnlyList<(Guid Id, string Nome, TorrentState Estado, int Seeds, int Peers)> EstadoDosTorrents()
+    public IReadOnlyList<(Guid Id, string Nome, TorrentEstado Estado, int Seeds, int Peers)> EstadoDosTorrents()
     {
-        return [.. _torrents.Values.Select(m => (
-            _torrents.First(p => p.Value == m).Key,
-            m.Torrent?.Name ?? m.Name ?? "?",
-            m.State,
-            m.Peers.Seeds,
-            m.Peers.Available))];
+        return [.. _torrents.Select(p => (
+        p.Key,
+        p.Value.Torrent?.Name ?? p.Value.Name ?? "?",
+        ConverterEstado(p.Value),
+        p.Value.Peers.Seeds,
+        p.Value.Peers.Available))];
     }
 
     private static string Multi(int vezes = 0, char c = '\t')
     {
         return $"{new string(c, vezes)}";
     }
+    private static TorrentEstado ConverterEstado(TorrentManager manager)
+    {
+        return manager.State switch
+        {
+            TorrentState.Error => TorrentEstado.Erro,
+            TorrentState.Seeding => TorrentEstado.Semeando,
+            TorrentState.Stopped => TorrentEstado.Parado,
+            TorrentState.Downloading => TorrentEstado.Baixando,
+            TorrentState.Paused => TorrentEstado.Pausado,
+            TorrentState.FetchingHashes => TorrentEstado.BuscandoHashs,
+            TorrentState.Hashing => TorrentEstado.VerificandoHash,
+            TorrentState.HashingPaused => TorrentEstado.HashPausado,
+            TorrentState.Starting => TorrentEstado.Iniciando,
+            TorrentState.Stopping => TorrentEstado.Parando,
+            TorrentState.Metadata => TorrentEstado.Metadata,
+            _ when manager.Progress >= 100d => TorrentEstado.Concluido,
+            _ => TorrentEstado.Erro,
+        };
+    }
 }
 
 public class Log
 {
-    private readonly ConcurrentQueue<string> HistoricoFluxo = new();
-    private StringBuilder SB { get; set; } = new();
+    private static readonly ConcurrentQueue<string> HistoricoFluxo = new();    
     private static int MaxLogsFluxo { get; set; } = 10;
-    private bool ExibirConsole { get; set; }
-    private bool ExibirArquivoLog { get; set; }
-    private bool logs { get; set; }
-    public void Adicionar(string mensagem) => Adicionar(mensagem, true, null, null);
-    public void Adicionar(string mensagem, bool logs, bool? exibirConsole, bool? exibirArquivoLog)
+    private static bool ExibirConsole { get; set; }
+    private static bool ExibirArquivoLog { get; set; }
+    public static StringBuilder SB { get; set; } = new();
+    public static void Adicionar() => Adicionar(null, null, null, null);
+    public static void Adicionar(string mensagem) => Adicionar(mensagem, false, null, null);
+    public static void Adicionar(string mensagem, bool? Logs) => Adicionar(mensagem, Logs, null, null);
+    public static void Adicionar(string? mensagem, bool? Logs, bool? exibirConsole, bool? exibirArquivoLog)
     {
-        if (!logs)
+        var x = Logs ?? false;
+        if (!x)
         {
-            SB.AppendLine(mensagem);
+            SB.AppendLine(mensagem ?? "");
             ExibirConsole = exibirConsole ?? true;
             ExibirArquivoLog = exibirArquivoLog ?? true;
         }
         else
         {
-            HistoricoFluxo.Enqueue(mensagem);
+            HistoricoFluxo.Enqueue(mensagem ?? "");
             ExibirConsole = exibirConsole ?? true;
             ExibirArquivoLog = exibirArquivoLog ?? true;
             while (HistoricoFluxo.Count > MaxLogsFluxo)
@@ -661,7 +704,7 @@ public class Log
     /// <summary>
     /// Exibe os logs na tela.
     /// </summary>
-    public void Exibir()
+    public static void Exibir()
     {
         var exibirLog = HistoricoFluxo.ToArray().Reverse();
 
@@ -684,10 +727,11 @@ public class Log
             SB.AppendLine(new string(' ', 110));
         }
 
-        AnsiConsole.MarkupLine(SBToString());
+        MarkupLine(SBToString());
     }
-    public string SBToString() => SB.ToString();
-    public void Limpar()
+    public static void MarkupLine(string mensagem) => AnsiConsole.MarkupLine(mensagem);
+    public static string SBToString() => SB.ToString();
+    public static void Limpar()
     {
         SB.Clear();
     }

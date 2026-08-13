@@ -2,11 +2,18 @@ namespace VideoDownloader.Services;
 
 internal enum TorrentEstado
 {
-    Baixando,
-    Semeando,
+    Parado,
     Pausado,
+    Iniciando,
+    Baixando,
     Concluido,
+    Semeando,
+    VerificandoHash,
+    HashPausado,
+    Parando,
     Erro,
+    Metadata,
+    BuscandoHashs
 }
 
 internal sealed record TorrentProgress(

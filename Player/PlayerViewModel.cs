@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 
@@ -199,13 +200,19 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         SubtitleTracks.Clear();
 
         var legendasProcessadas = spuTracks
-            .Where(t => t.Id >= 0 && !string.IsNullOrWhiteSpace(t.Name)) // Ignora faixas corrompidas ou nulas
-            .Select(t => new TrackItem(t.Id, NomeDaFaixa(t.Name, "Legenda", t.Id)))
-            .GroupBy(t => t.Name) // Remove legendas duplicadas com nomes idênticos no contêiner do torrent
-            .Select(g => g.First())
-            .OrderByDescending(t => t.Name.Contains("Português")) // Joga Português para o topo do ContextMenu
-            .ThenByDescending(t => t.Name.Contains("Inglês"))     // Joga Inglês em segundo
-            .ThenBy(t => t.Name);
+        .Where(t => t.Id >= 0 && !string.IsNullOrWhiteSpace(t.Name))
+        .Select(t => new TrackItem(t.Id, NomeDaFaixa(t.Name, "Legenda", t.Id)))
+        // Modificado: Agrupa por ID + Nome para evitar apagar faixas legítimas repetidas
+        .GroupBy(t => new { t.Id, t.Name })
+        .Select(g => g.First())
+        // Prioriza Português e Inglês no topo
+        .OrderByDescending(t => t.Name.Contains("Português"))
+        .ThenByDescending(t => t.Name.Contains("Inglês"))
+        // CORREÇÃO DA ORDENAÇÃO NUMÉRICA (Ex: Legenda 2 aparece antes de Legenda 19)
+        .ThenBy(t => Regex.IsMatch(t.Name, @"\d+")
+            ? int.Parse(Regex.Match(t.Name, @"\d+").Value)
+            : int.MaxValue)
+        .ThenBy(t => t.Name);
 
         SubtitleTracks.Add(new TrackItem(-1, "❌ Desativar Legendas"));
 
@@ -248,47 +255,52 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         }
 
         var limpo = nome.Trim().ToLower();
+        string idiomaDetectado = nome.Trim();
 
         if (limpo.Contains("por") || limpo.Contains("pt") || limpo.Contains("portuguese"))
         {
-            return "Português (BR)";
+            idiomaDetectado = "Português (BR)";
         }
-        if (limpo.Contains("eng") || limpo.Contains("en") || limpo.Contains("english"))
+        else if (limpo.Contains("eng") || limpo.Contains("en") || limpo.Contains("english"))
         {
-            return "Inglês";
+            idiomaDetectado = "Inglês";
         }
-        if (limpo.Contains("spa") || limpo.Contains("es") || limpo.Contains("spanish") || limpo.Contains("espanol"))
+        else if (limpo.Contains("spa") || limpo.Contains("es") || limpo.Contains("spanish") || limpo.Contains("espanol"))
         {
-            return "Espanhol";
+            idiomaDetectado = "Espanhol";
         }
-        if (limpo.Contains("fre") || limpo.Contains("fr") || limpo.Contains("french"))
+        else if (limpo.Contains("fre") || limpo.Contains("fr") || limpo.Contains("french"))
         {
-            return "Francês";
+            idiomaDetectado = "Francês";
         }
-        if (limpo.Contains("ger") || limpo.Contains("de") || limpo.Contains("german"))
+        else if (limpo.Contains("ger") || limpo.Contains("de") || limpo.Contains("german"))
         {
-            return "Alemão";
+            idiomaDetectado = "Alemão";
         }
-        if (limpo.Contains("jap") || limpo.Contains("ja") || limpo.Contains("japanese"))
+        else if (limpo.Contains("jap") || limpo.Contains("ja") || limpo.Contains("japanese"))
         {
-            return "Japonês";
+            idiomaDetectado = "Japonês";
         }
-
-        foreach (var idioma in Idiomas)
+        else
         {
-            if (limpo.Contains(idioma.Key))
+            foreach (var idioma in Idiomas)
             {
-                return idioma.Value;
+                if (limpo.Contains(idioma.Key))
+                {
+                    idiomaDetectado = idioma.Value;
+                    break;
+                }
             }
         }
 
-        // Se for o padrão "Track N" do VLC sem metadados, deixa descritivo
+        // Se o VLC retornar apenas "Track N", padroniza o termo
         if (limpo.StartsWith("track", StringComparison.OrdinalIgnoreCase))
         {
             return $"{tipo} {id}";
         }
-        
-        return nome.Trim();
+
+        // Retorna o nome do idioma acompanhado do número da faixa para o usuário conseguir diferenciar
+        return $"{idiomaDetectado} [{id}]";
     }
 
     private void OnPositionChanged(object? sender, MediaPlayerPositionChangedEventArgs e)
