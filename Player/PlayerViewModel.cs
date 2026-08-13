@@ -41,6 +41,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         _mediaPlayer.Paused += OnPaused;
         _mediaPlayer.Stopped += OnStopped;
         _mediaPlayer.EndReached += OnEndReached;
+        _mediaPlayer.Buffering += OnPlayerBuffering;
         _mediaPlayer.EncounteredError += (_, _) =>
         {
             Log($"EncounteredError | State={_mediaPlayer.State} | Mrl={_mediaPlayer.Media?.Mrl}");
@@ -326,9 +327,25 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         Log("EVENT EndReached");
         IsPlaying = false;
     }
+    private void OnPlayerBuffering(object? sender, MediaPlayerBufferingEventArgs e)
+    {
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            float cachePreenchido = e.Cache;
 
+            if (cachePreenchido < 100)
+            {
+                IsLoading = true;
+                Log($"[ALERTA REDE] Buffer abaixo do padrão! Reabastecendo: {cachePreenchido:0.0}%");
+            }
+            else
+            {
+                IsLoading = false;
+                Log("[ALERTA REDE] Buffer cheio. Continuando reprodução.");
+            }
+        });
+    }   
     public event PropertyChangedEventHandler? PropertyChanged;
-
     private void OnPropertyChanged([CallerMemberName] string? name = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -346,7 +363,8 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         _mediaPlayer.Paused -= OnPaused;
         _mediaPlayer.Stopped -= OnStopped;
         _mediaPlayer.EndReached -= OnEndReached;
-
+        _mediaPlayer.Buffering -= OnPlayerBuffering;
+        
         try
         {
             if (_mediaPlayer.IsPlaying)
