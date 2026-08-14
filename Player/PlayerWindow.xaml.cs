@@ -3,27 +3,19 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using VideoDownloader.Services;
 namespace VideoDownloader.Player;
 
 public partial class PlayerWindow : Window
 {
-    private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "player-debug.log");
+    private Log Log { get; set; } = new();
     private readonly PlayerViewModel _viewModel;
     private readonly ControlsWindow _controls;
     private readonly DispatcherTimer _inactivityTimer;
 
-    private static void Log(string mensagem)
-    {
-        try
-        {
-            File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {mensagem}{Environment.NewLine}");
-        }
-        catch { /* log é best-effort */ }
-    }
-
     public PlayerWindow(string mediaUrl)
     {
-        Log($"PlayerWindow ctor | mediaUrl={mediaUrl}");
+        Log.Listar($"PlayerWindow ctor | mediaUrl={mediaUrl}", true);
         InitializeComponent();
 
         Core.Initialize();
@@ -34,7 +26,7 @@ public partial class PlayerWindow : Window
         DataContext = _viewModel;
 
         VideoView.MediaPlayer = mediaPlayer;
-        Log("MediaPlayer associado ao VideoView");
+        Log.Listar("MediaPlayer associado ao VideoView", true);
 
         // Janela de controles separada (evita o airspace do HWND nativo bloquear os cliques).
         // Owner é atribuído no Loaded (a janela dona precisa estar visível antes).
@@ -51,7 +43,7 @@ public partial class PlayerWindow : Window
 
         Loaded += (_, _) =>
         {
-            Log("Loaded disparado — posicionando controles");
+            Log.Listar("Loaded disparado — posicionando controles", true);
             // Owner garante que a janela de controles fique sempre à frente do player.
             _controls.Owner = this;
 
@@ -67,11 +59,11 @@ public partial class PlayerWindow : Window
             try
             {
                 await IniciarAsync(mediaUrl);
-                Log("IniciarAsync concluído");
+                Log.Listar("IniciarAsync concluído", true);
             }
             catch (Exception ex)
             {
-                Log($"IniciarAsync EXCEPTION: {ex}");
+                Log.Listar($"IniciarAsync EXCEPTION: {ex}", true);
                 File.AppendAllText(
                     Path.Combine(AppContext.BaseDirectory, "vlc-errors.log"),
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] IniciarAsync EXCEPTION: {ex}{Environment.NewLine}");
@@ -81,7 +73,8 @@ public partial class PlayerWindow : Window
         };
         Closed += (_, _) =>
         {
-            Log("Window fechada — dispose do ViewModel");
+            Log.Listar("Window fechada — dispose do ViewModel", true);
+            Log.Imprimir();
             _inactivityTimer.Stop();
             _controls.Close();
             _viewModel.Dispose();
@@ -97,7 +90,7 @@ public partial class PlayerWindow : Window
     private async Task IniciarAsync(string mediaUrl)
     {
         _viewModel.IsLoading = true;
-        Log("Criando Media");
+        Log.Listar("Criando Media", true);
         // Sem 'using': o PlayerViewModel é o dono do Media e faz o Dispose no fechamento.
         var media = new Media(_viewModel.LibVLC, mediaUrl, FromType.FromLocation);
 
@@ -110,9 +103,9 @@ public partial class PlayerWindow : Window
         media.AddOption(":clock-jitter=5000");
 
         _viewModel.SetMedia(media);
-        Log("SetMedia + Play chamados");
+        Log.Listar("SetMedia + Play chamados", true);
         await _viewModel.PopulateTracksAsync();
-        Log("PopulateTracksAsync concluído");
+        Log.Listar("PopulateTracksAsync concluído", true);
         ShowControls();
     }
 

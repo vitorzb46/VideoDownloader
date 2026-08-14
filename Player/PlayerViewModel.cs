@@ -6,12 +6,13 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
+using VideoDownloader.Services;
 
 namespace VideoDownloader.Player;
 
 public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
 {
-    private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "player-debug.log");
+    private Log Log {get; set;} = new();
     private readonly LibVLC _libVLC;
     private readonly MediaPlayer _mediaPlayer;
     private Media? _media;
@@ -22,15 +23,6 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     private bool _isPlaying;
     private double _position;
     private int _volume = 100;
-
-    private static void Log(string mensagem)
-    {
-        try
-        {
-            File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] VM: {mensagem}{Environment.NewLine}");
-        }
-        catch { /* log é best-effort */ }
-    }
 
     public PlayerViewModel(LibVLC libVLC, MediaPlayer mediaPlayer)
     {
@@ -45,7 +37,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         _mediaPlayer.Buffering += OnPlayerBuffering;
         _mediaPlayer.EncounteredError += (_, _) =>
         {
-            Log($"EncounteredError | State={_mediaPlayer.State} | Mrl={_mediaPlayer.Media?.Mrl}");
+            Log.Listar($"EncounteredError | State={_mediaPlayer.State} | Mrl={_mediaPlayer.Media?.Mrl}", true);
             // Diagnóstico visível: escreve o erro do VLC em um arquivo de log local.
             try
             {
@@ -106,7 +98,6 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         {
             var novo = Math.Clamp(value, 0, 100);
             if (novo == _volume) return;
-            Log($"Volume {_volume} -> {novo}");
             _volume = novo;
             _mediaPlayer.Volume = _volume;
             OnPropertyChanged();
@@ -117,21 +108,21 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     {
         _media?.Dispose();
         _media = media;
-        Log($"SetMedia | Mrl={media.Mrl}");
+        Log.Listar($"SetMedia | Mrl={media.Mrl}", true);
         _mediaPlayer.Play(_media);
-        Log($"Play() chamado | State={_mediaPlayer.State}");
+        Log.Listar($"Play() chamado | State={_mediaPlayer.State}", true);
         IsLoading = true;
     }
 
     public void SeekTo(double percent)
     {
-        Log($"SeekTo | percent={percent:0.0}");
+        Log.Listar($"SeekTo | percent={percent:0.0}", true);
         _mediaPlayer.Position = (float)Math.Clamp(percent / 100.0, 0.0, 1.0);
     }
 
     public void TogglePlay()
     {
-        Log($"TogglePlay | IsPlaying={_mediaPlayer.IsPlaying} State={_mediaPlayer.State}");
+        Log.Listar($"TogglePlay | IsPlaying={_mediaPlayer.IsPlaying} State={_mediaPlayer.State}", true);
         if (_mediaPlayer.IsPlaying)
         {
             _mediaPlayer.Pause();
@@ -193,6 +184,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         AudioTracks.Clear();
         foreach (var t in audioTracks.Where(t => t.Id >= 0))
         {
+            Log.Listar($"AudioTrack: {t.Name}", true);
             AudioTracks.Add(new TrackItem(t.Id, NomeDaFaixa(t.Name, "Áudio", t.Id)));
         }
 
@@ -213,11 +205,12 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
             ? int.Parse(Regex.Match(t.Name, @"\d+").Value)
             : int.MaxValue)
         .ThenBy(t => t.Name);
-
+        
         SubtitleTracks.Add(new TrackItem(-1, "❌ Desativar Legendas"));
 
         foreach (var item in legendasProcessadas)
         {
+            Log.Listar($"SubtitleTrack: {item.Name}", true);
             SubtitleTracks.Add(item);
         }
 
@@ -287,6 +280,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
             {
                 if (limpo.Contains(idioma.Key))
                 {
+                    Log.Listar($"Idioma detectado: {idioma.Value}", true);
                     idiomaDetectado = idioma.Value;
                     break;
                 }
@@ -320,23 +314,23 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
 
     private void OnPlaying(object? sender, EventArgs e)
     {
-        Log($"EVENT Playing | State={_mediaPlayer.State}");
+        Log.Listar($"EVENT Playing | State={_mediaPlayer.State}", true);
         IsPlaying = true;
         IsLoading = false;
     }
     private void OnPaused(object? sender, EventArgs e)
     {
-        Log("EVENT Paused");
+        Log.Listar("EVENT Paused", true);
         IsPlaying = false;
     }
     private void OnStopped(object? sender, EventArgs e)
     {
-        Log("EVENT Stopped");
+        Log.Listar("EVENT Stopped", true);
         IsPlaying = false;
     }
     private void OnEndReached(object? sender, EventArgs e)
     {
-        Log("EVENT EndReached");
+        Log.Listar("EVENT EndReached", true);
         IsPlaying = false;
     }
     private void OnPlayerBuffering(object? sender, MediaPlayerBufferingEventArgs e)
@@ -348,12 +342,12 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
             if (cachePreenchido < 100)
             {
                 IsLoading = true;
-                Log($"[ALERTA REDE] Buffer abaixo do padrão! Reabastecendo: {cachePreenchido:0.0}%");
+                Log.Listar($"[ALERTA REDE] Preenchendo buffer: {cachePreenchido:0.0}%", true);
             }
             else
             {
                 IsLoading = false;
-                Log("[ALERTA REDE] Buffer cheio. Continuando reprodução.");
+                Log.Listar("[ALERTA REDE] Buffer cheio. Continuando reprodução.", true);
             }
         });
     }   
@@ -367,7 +361,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        Log("Dispose do ViewModel iniciado");
+        Log.Listar("Dispose do ViewModel iniciado", true);
 
         // Remove imediatamente as inscrições de eventos para evitar callbacks fantasmas
         _mediaPlayer.PositionChanged -= OnPositionChanged;
@@ -393,9 +387,10 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (Exception ex)
         {
-            Log($"Erro durante o dispose nativo do VLC: {ex.Message}");
+            Log.Listar($"Erro durante o dispose nativo do VLC: {ex.Message}", true);
         }
 
-        Log("Dispose do ViewModel concluído");
+        Log.Listar("Dispose do ViewModel concluído", true);
+        Log.Imprimir();
     }
 }

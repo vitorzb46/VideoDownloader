@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using VideoDownloader;
 using VideoDownloader.Constantes;
+using VideoDownloader.Services;
 using YoutubeExplode;
 
 [assembly: System.Resources.NeutralResourcesLanguage("pt-BR")]
@@ -34,6 +35,7 @@ internal sealed partial class Program
 
         services.AddTransient<DownloadApplication>();
         services.AddSingleton<YoutubeClient>(provider => new YoutubeClient(ObterCookiesAutenticados()));
+        services.AddSingleton<Log>();
         services.AddSingleton<ClientEngine>(sp =>
         {
             var settingBuilder = new EngineSettingsBuilder

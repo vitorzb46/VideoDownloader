@@ -1,16 +1,14 @@
 using Microsoft.Win32;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Threading;
+using VideoDownloader.Services;
 
 namespace VideoDownloader.Player;
 
 public partial class ControlsWindow : Window
 {
-    private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "player-debug.log");
+    private Log Log { get; set; } = new();
     private readonly PlayerViewModel _viewModel;
     private bool _isSeeking;
 
@@ -24,15 +22,6 @@ public partial class ControlsWindow : Window
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = viewModel;
-    }
-
-    private static void Log(string mensagem)
-    {
-        try
-        {
-            File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {mensagem}{Environment.NewLine}");
-        }
-        catch { /* log é best-effort */ }
     }
 
     // --- Timeline (proteção contra loop) ---
@@ -52,7 +41,7 @@ public partial class ControlsWindow : Window
     {
         if (e.OriginalSource is MenuItem menuItem && menuItem.DataContext is TrackItem track)
         {
-            Log($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})");
+            Log.Listar($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})", true);
             _viewModel.SelectSubtitleTrack(track.Id);
 
             // FECHAMENTO AUTOMÁTICO: Localiza o menu pai e fecha
@@ -65,7 +54,7 @@ public partial class ControlsWindow : Window
     {
         if (e.OriginalSource is MenuItem menuItem && menuItem.DataContext is TrackItem track)
         {
-            Log($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})");
+            Log.Listar($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})", true);
             _viewModel.SelectSubtitleTrack(track.Id);
         }
     }
@@ -84,7 +73,7 @@ public partial class ControlsWindow : Window
 
     private void LoadSubtitleButton_Click(object sender, RoutedEventArgs e)
     {
-        Log("LoadSubtitleButton_Click");
+        Log.Listar("LoadSubtitleButton_Click");
         var dialog = new OpenFileDialog
         {
             Filter = "Legendas (*.srt;*.vtt)|*.srt;*.vtt|Todos os arquivos (*.*)|*.*",
@@ -93,6 +82,7 @@ public partial class ControlsWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
+            Log.Listar("Legenda {dialog.FileName} carregada!", true);
             _viewModel.LoadExternalSubtitle(dialog.FileName);
         }
     }
@@ -133,7 +123,6 @@ public partial class ControlsWindow : Window
             atual = (atual as FrameworkElement)?.Parent ?? System.Windows.Media.VisualTreeHelper.GetParent(atual);
         }
 
-        // Se encontrou o menu, fecha ele imediatamente
         if (atual is ContextMenu menu)
         {
             menu.IsOpen = false;
