@@ -51,6 +51,7 @@ public class Log
     /// </summary>
     public static void Imprimir()
     {
+        Limpar();
         SB.AppendLine(CultureInfo.InvariantCulture, $"[cyan]{Multi(110, '-')}[/]");
         SB.AppendLine(CultureInfo.InvariantCulture, $"{Multi(30, ' ')}[cyan]=== ÚLTIMOS LOGS DO SISTEMA ===[/]");
         var exibirLog = HistoricoDeLogs.ToArray().Reverse();

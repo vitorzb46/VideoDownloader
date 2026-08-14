@@ -2,11 +2,14 @@
 using MonoTorrent;
 using MonoTorrent.Client;
 using MonoTorrent.Streaming;
+using MonoTorrent.Trackers;
+using ReusableTasks;
 using Spectre.Console;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using VideoDownloader.Constantes;
 using VideoDownloader.Progress;
@@ -16,7 +19,7 @@ namespace VideoDownloader.Services.Implementation;
 /// <summary>
 /// Resultado do streaming: prefixo HTTP e URL completa do stream, para o Player WPF.
 /// </summary>
-public sealed record StreamResult(string HttpPrefix, string FullUri);
+internal sealed record StreamResult(string HttpPrefix, string FullUri);
 internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings appContext, Log log, IStringLocalizer<TorrentDownloadService> localizer)
 {
     private readonly AppSettings AppContext = appContext;
@@ -132,8 +135,8 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         var pastaDownload = Path.Combine(Directory.GetCurrentDirectory(), AppContext.PastaDownloads ?? "Downloads");
         Directory.CreateDirectory(pastaDownload);
 
-        MonoTorrent.Streaming.IHttpStream? stream = null;
-        System.Diagnostics.Process? player = null;
+        IHttpStream? stream = null;
+        Process? player = null;
 
         try
         {
@@ -145,6 +148,9 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
                 Log.Listar(Localizer["Torrent_ErroAoBaixar"], true);
                 throw new InvalidOperationException("Falha ao criar o gerenciador de streaming.");
             }
+
+            //Buscar lista de trackers
+            await GetTrackers(magnet, manager, cancellationToken).ConfigureAwait(false);
 
             _torrents[id] = manager;
 
@@ -344,6 +350,85 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             {
                 break;
             }
+        }
+    }
+    private static async Task GetTrackers(MagnetLink magnet, TorrentManager manager, CancellationToken cancellationToken)
+    {
+        string url = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt";
+        string trackers;
+        HttpRequestMessage? request = null;
+        HttpResponseMessage response;
+        HttpClient client = new();
+        List<string> trackerList;
+        IEnumerable<string> trackersOriginal;
+        List<string> trackerListFinal;
+        using var ctsTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        ctsTimeout.CancelAfter(TimeSpan.FromSeconds(4));
+        using var ctsGitHub = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        try
+        {
+            request = new HttpRequestMessage(HttpMethod.Get, url);
+            response = await client!.SendAsync(request, ctsGitHub.Token).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            trackers = await response.Content.ReadAsStringAsync(ctsGitHub.Token).ConfigureAwait(false);
+            trackerList = [.. trackers.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+            trackersOriginal = magnet.AnnounceUrls ?? Enumerable.Empty<string>();
+            trackerListFinal = [.. trackersOriginal.Union(trackerList, StringComparer.OrdinalIgnoreCase)];
+
+            Log.Listar("Atualizando os trackers, aguarde...", false);
+            await Task.Run(async () =>
+            {
+                var contador = 0;
+                foreach (var tracker in trackerListFinal)
+                {
+                    if (Uri.TryCreate(tracker, UriKind.Absolute, out Uri? trackerUri))
+                    {
+                        contador++;
+                        Log.Listar($"[[{contador}/{trackerListFinal.Count}]] {tracker} - adicionado.", true);
+                        await manager.TrackerManager.AddTrackerAsync(trackerUri).ConfigureAwait(false);
+                    }
+                }
+
+                var tarefaOtimizadaAnnounce = manager.TrackerManager.AnnounceAsync(ctsTimeout.Token);
+                Task tarefaDoAnnounce = tarefaOtimizadaAnnounce.AsTask();
+                Task relogioAnnounce = Task.Delay(TimeSpan.FromSeconds(4));
+
+                Task ganhouAnnounce = await Task.WhenAny(tarefaDoAnnounce, relogioAnnounce).ConfigureAwait(false);
+
+                if (ganhouAnnounce == relogioAnnounce)
+                {
+                    Log.Listar("[[ALERTA]] AnnounceAsync travou a rede interna e estourou o limite de tempo. Abortando e avançando...", false);
+                }
+                else
+                {
+                    try { await tarefaDoAnnounce; Log.Listar("[[DEBUG]] AnnounceAsync concluído com sucesso.", true); }
+                    catch (Exception ex) { Log.Listar($"[[DEBUG]] AnnounceAsync respondeu com erro: {ex.Message}", true); }
+                }
+
+            }, cancellationToken).ConfigureAwait(false);
+
+        }
+        catch (OperationCanceledException)
+        {
+            if (ctsGitHub.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                Log.Listar("[[AVISO]] Tempo limite esgotado ao baixar a lista de trackers (Timeout). O download tentará iniciar apenas com os trackers originais.", false);
+            }
+            else
+            {
+                Log.Listar("[[ERRO]] Operação cancelada pelo usuário.", false);
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Listar($"Falha ao obter lista de trackers: {ex.Message}", true);
+        }
+        finally
+        {
+            request?.Dispose();
+            client.Dispose();
         }
     }
     private async Task<Process?> LoopPlayer(IHttpStream? stream, CancellationToken cancellationToken)
