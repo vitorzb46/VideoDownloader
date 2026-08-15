@@ -153,15 +153,27 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     {
         if (filePath is not string path || !File.Exists(path)) return;
 
-        if (_mediaPlayer.AddSlave(MediaSlaveType.Subtitle, path, select: true))
-        {
-            SubtitleTracks.Add(new TrackItem(-99, Path.GetFileName(path)));
-            OnPropertyChanged(nameof(SubtitleTracks));
-        }
+        _mediaPlayer.AddSlave(MediaSlaveType.Subtitle, path, select: true);
+
+        //if (_mediaPlayer.AddSlave(MediaSlaveType.Subtitle, path, select: true))
+        //{
+        //    SubtitleTracks.Add(new TrackItem(-99, Path.GetFileName(path)));
+        //    OnPropertyChanged(nameof(SubtitleTracks));
+        //}
     }
 
     public async Task PopulateTracksAsync(CancellationToken ct = default)
     {
+        var audioTrackCount = _mediaPlayer.AudioTrackCount;
+        var subtitleTrackCount = _mediaPlayer.SpuCount;
+        var trackDesc = _mediaPlayer.SpuDescription ?? [];
+        Log.Salvar($"Àudios: {audioTrackCount} | Legendas {subtitleTrackCount}");
+
+        foreach (var t in trackDesc)
+        {
+            Log.Salvar($"Track: {t.Id} | {t.Name}");
+        }
+
         // Aguarda o vídeo iniciar (o MediaPlayer precisa do media carregado), com timeout
         // para não travar a UI caso a mídia falhe (ex.: URL inacessível).
         var esperaInicio = Task.Delay(TimeSpan.FromSeconds(15), ct);
@@ -192,9 +204,19 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         var spuTracks = _mediaPlayer.SpuDescription ?? [];
         SubtitleTracks.Clear();
 
+        
+        
+        var metadadosLegendas = (_mediaPlayer.Media?.Tracks ?? [])
+            .Where(t => t.TrackType == TrackType.Text)
+            .ToDictionary(t => t.Id, t => (t.Language, t.Description));
+
+        // Exclui legendas com idioma indefinido (ex.: "und") — deixa visível apenas legendas reais.
+        // O NomeDaFaixa retorna "Legenda N" como fallback quando não há idioma/descrição válidos.
         var legendasProcessadas = spuTracks
-        .Where(t => t.Id >= 0 && !string.IsNullOrWhiteSpace(t.Name))
-        .Select(t => new TrackItem(t.Id, NomeDaFaixa(t.Name, "Legenda", t.Id)))
+        .Where(t => t.Id >= 0)
+        .Select(t => new TrackItem(t.Id, NomeDaFaixa(t.Name, "Legenda", t.Id, metadadosLegendas.TryGetValue(t.Id, out var meta) ? meta.Language : null, metadadosLegendas.TryGetValue(t.Id, out meta) ? meta.Description : null)))
+        // Filtra o fallback "Legenda N" (idioma indefinido) — não é uma legenda real.
+        .Where(t => !Regex.IsMatch(t.Name, @"^Legenda \d+$"))
         // Modificado: Agrupa por ID + Nome para evitar apagar faixas legítimas repetidas
         .GroupBy(t => new { t.Id, t.Name })
         .Select(g => g.First())
@@ -209,8 +231,13 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         
         SubtitleTracks.Add(new TrackItem(-1, "❌ Desativar Legendas"));
 
-        foreach (var item in legendasProcessadas)
+        if (!legendasProcessadas.Any())
         {
+            Log.Salvar("Nenhuma legenda real encontrada.");
+        }
+
+        foreach (var item in legendasProcessadas)
+        {            
             Log.Salvar($"SubtitleTrack: {item.Name}");
             SubtitleTracks.Add(item);
         }
@@ -238,55 +265,37 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     };
 
     /// <summary>
-    /// Gera um nome legível para uma faixa: mapeia códigos de idioma (ex.: "por" → "Português"),
+    /// Gera um nome legível para uma faixa: prioriza o idioma/descrição reais dos metadados
+    /// (Media.Tracks), mapeia códigos de idioma (ex.: "por" → "Português"),
     /// converte "Track N" genérico em "Áudio N"/"Legenda N" e preserva descrições reais (ex.: "AC-3").
     /// </summary>
-    private static string NomeDaFaixa(string? nome, string tipo, int id)
+    private static string NomeDaFaixa(string? nome, string tipo, int id, string? idiomaReal = null, string? descricaoReal = null)
     {
-        if (string.IsNullOrWhiteSpace(nome))
+        // 1. Idiomas/descrições reais dos metadados têm prioridade máxima.
+        // "und"/"undetermined" = idioma indefinido → trata como ausente.
+        var idioma = EhIdiomaValido(idiomaReal) ? TraduzirIdioma(idiomaReal!) : null;
+        if (idioma is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(descricaoReal))
+            {
+                return $"{idioma} - {descricaoReal}";
+            }
+            return idioma;
+        }
+
+        if (!string.IsNullOrWhiteSpace(descricaoReal))
+        {
+            return descricaoReal;
+        }
+
+        // 2. Sem metadados: usa o nome do SpuDescription.
+        if (string.IsNullOrWhiteSpace(nome) || EhIdiomaIndefinido(nome))
         {
             return $"{tipo} {id}";
         }
 
         var limpo = nome.Trim().ToLower();
-        string idiomaDetectado = nome.Trim();
-
-        if (limpo.Contains("por") || limpo.Contains("pt") || limpo.Contains("portuguese"))
-        {
-            idiomaDetectado = "Português (BR)";
-        }
-        else if (limpo.Contains("eng") || limpo.Contains("en") || limpo.Contains("english"))
-        {
-            idiomaDetectado = "Inglês";
-        }
-        else if (limpo.Contains("spa") || limpo.Contains("es") || limpo.Contains("spanish") || limpo.Contains("espanol"))
-        {
-            idiomaDetectado = "Espanhol";
-        }
-        else if (limpo.Contains("fre") || limpo.Contains("fr") || limpo.Contains("french"))
-        {
-            idiomaDetectado = "Francês";
-        }
-        else if (limpo.Contains("ger") || limpo.Contains("de") || limpo.Contains("german"))
-        {
-            idiomaDetectado = "Alemão";
-        }
-        else if (limpo.Contains("jap") || limpo.Contains("ja") || limpo.Contains("japanese"))
-        {
-            idiomaDetectado = "Japonês";
-        }
-        else
-        {
-            foreach (var idioma in Idiomas)
-            {
-                if (limpo.Contains(idioma.Key))
-                {
-                    Log.Salvar($"Idioma detectado: {idioma.Value}");
-                    idiomaDetectado = idioma.Value;
-                    break;
-                }
-            }
-        }
+        string? idiomaDetectado = TraduzirIdioma(nome.Trim());
 
         // Se o VLC retornar apenas "Track N", padroniza o termo
         if (limpo.StartsWith("track", StringComparison.OrdinalIgnoreCase))
@@ -295,7 +304,77 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         }
 
         // Retorna o nome do idioma acompanhado do número da faixa para o usuário conseguir diferenciar
-        return $"{idiomaDetectado} [{id}]";
+        return idiomaDetectado is null ? $"{tipo} {id}" : $"{idiomaDetectado} [{id}]";
+    }
+
+    /// <summary>Indica se o código de idioma é realmente um idioma (não "und"/"undetermined"/vazio).</summary>
+    private static bool EhIdiomaValido(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return false;
+        var limpo = valor.Trim().ToLower();
+        return limpo is not ("und" or "undetermined" or "unknown" or "mis" or "mul" or "zxx" or "???");
+    }
+
+    /// <summary>Indica se o valor representa "idioma indefinido" (ex.: "und").</summary>
+    private static bool EhIdiomaIndefinido(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return true;
+        return !EhIdiomaValido(valor);
+    }
+
+    private static string? TraduzirIdioma(string valor)
+    {
+        if (!EhIdiomaValido(valor)) return null;
+
+        var limpo = valor.Trim().ToLower();
+        if (limpo.Contains("por") || limpo.Contains("pt") || limpo.Contains("portuguese"))
+        {
+            return "Português (BR)";
+        }
+        if (limpo.Contains("eng") || limpo.Contains("en") || limpo.Contains("english"))
+        {
+            return "Inglês";
+        }
+        if (limpo.Contains("spa") || limpo.Contains("es") || limpo.Contains("spanish") || limpo.Contains("espanol"))
+        {
+            return "Espanhol";
+        }
+        if (limpo.Contains("fre") || limpo.Contains("fr") || limpo.Contains("french"))
+        {
+            return "Francês";
+        }
+        if (limpo.Contains("ger") || limpo.Contains("de") || limpo.Contains("german"))
+        {
+            return "Alemão";
+        }
+        if (limpo.Contains("jap") || limpo.Contains("ja") || limpo.Contains("japanese"))
+        {
+            return "Japonês";
+        }
+        if (limpo.Contains("kor") || limpo.Contains("ko") || limpo.Contains("korean"))
+        {
+            return "Coreano";
+        }
+        if (limpo.Contains("chi") || limpo.Contains("zh") || limpo.Contains("chinese"))
+        {
+            return "Chinês";
+        }
+        if (limpo.Contains("rus") || limpo.Contains("ru") || limpo.Contains("russian"))
+        {
+            return "Russo";
+        }
+        if (limpo.Contains("ara") || limpo.Contains("ar") || limpo.Contains("arabic"))
+        {
+            return "Árabe";
+        }
+        foreach (var idioma in Idiomas)
+        {
+            if (limpo.Contains(idioma.Key))
+            {
+                return idioma.Value;
+            }
+        }
+        return null;
     }
 
     private void OnPositionChanged(object? sender, MediaPlayerPositionChangedEventArgs e)

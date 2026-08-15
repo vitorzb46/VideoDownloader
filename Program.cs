@@ -14,7 +14,7 @@ internal sealed partial class Program
     private static async Task Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
-
+        Console.CursorVisible = false;
         // System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo("en-US");
 
         var serviceProvider = ConfigureServices();

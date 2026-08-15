@@ -118,51 +118,51 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Torrent_NenhumEncontrado" xml:space="preserve">
-    <value>[[Erro]] - Nenhum torrent encontrado na pasta '{0}'</value>
+    <value>Erro - Nenhum torrent encontrado na pasta '{0}'</value>
   </data>
   <data name="Torrent_ErroAoBaixar" xml:space="preserve">
-    <value>[[Erro]] - Erro ao baixar torrent: {0}</value>
+    <value>Erro ao baixar torrent: {0}</value>
   </data>
   <data name="Torrent_PeersEncontrados" xml:space="preserve">
-    <value>[[Status]] - {0}: {1} peers for {2}</value>
+    <value>Status - {0}: {1} peers for {2}</value>
   </data>
   <data name="Torrent_ConexaoSucesso" xml:space="preserve">
-    <value>[[Status]] - Connection succeeded: {0}</value>
+    <value>Status - Connection succeeded: {0}</value>
   </data>
   <data name="Torrent_ConexaoFalha" xml:space="preserve">
-    <value>[[Status]] - Connection failed: {0}</value>
+    <value>Status - Connection failed: {0}</value>
   </data>
   <data name="Torrent_StatusMudanca" xml:space="preserve">
-    <value>[[Status]] {0}: {1}</value>
+    <value>Status - {0}: {1}</value>
   </data>
   <data name="Torrent_ErroInterno" xml:space="preserve">
-    <value>[[Erro]] O torrent parou devido a uma falha interna.</value>
+    <value>Erro - O torrent parou devido a uma falha interna.</value>
   </data>
   <data name="Torrent_Sucesso" xml:space="preserve">
     <value>[[Sucesso]] {0} finalizado!</value>
   </data>
   <data name="Torrent_AbortandoTodos" xml:space="preserve">
-    <value>[[Aviso]] - Abortando todos os downloads...</value>
+    <value>Aviso - Abortando todos os downloads...</value>
   </data>
   <data name="Torrent_DigiteId" xml:space="preserve">
     <value>Digite o id do torrent para abortar:</value>
   </data>
   <data name="Torrent_IdInvalido" xml:space="preserve">
-    <value>[[Erro]] - Id inválido.</value>
+    <value>Erro - Id inválido.</value>
   </data>
   <data name="Torrent_AvisoCache" xml:space="preserve">
-    <value>[[Aviso]] - '{0}' está tentando baixar cache externo e foi ignorado.</value>
+    <value>Aviso - '{0}' está tentando baixar cache externo e foi ignorado.</value>
   </data>
   <data name="Torrent_FalhaCarregar" xml:space="preserve">
-    <value>[[Erro]] - Falha ao carregar o arquivo '{0}'</value>
+    <value>Erro - Falha ao carregar o arquivo '{0}'</value>
   </data>
   <data name="Torrent_ErroProcessar" xml:space="preserve">
-    <value>[[Erro]] - Falha ao processar '{0}': {1}</value>
+    <value>Erro - Falha ao processar '{0}': {1}</value>
   </data>
   <data name="Torrent_Registrando" xml:space="preserve">
-    <value>[[Aviso]] - Registrando {0} torrents no Engine...</value>
+    <value>Aviso  - Registrando {0} torrents no Engine...</value>
   </data>
   <data name="Torrent_FalhaRegistrar" xml:space="preserve">
-    <value>[[Erro]] - Não foi possível registrar {0}: {1}</value>
+    <value>Erro - Não foi possível registrar {0}: {1}</value>
   </data>
 </root>

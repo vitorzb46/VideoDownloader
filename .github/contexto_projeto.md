@@ -133,7 +133,10 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     public void LoadExternalSubtitle(object? filePath)
     public async Task PopulateTracksAsync(CancellationToken ct = default)
     private static readonly Dictionary<string, string> Idiomas = new(StringComparer.OrdinalIgnoreCase)
-    private static string NomeDaFaixa(string? nome, string tipo, int id)
+    private static string NomeDaFaixa(string? nome, string tipo, int id, string? idiomaReal = null, string? descricaoReal = null)
+    private static bool EhIdiomaValido(string? valor)
+    private static bool EhIdiomaIndefinido(string? valor)
+    private static string? TraduzirIdioma(string valor)
     private void OnPositionChanged(object? sender, MediaPlayerPositionChangedEventArgs e)
     private void OnPlaying(object? sender, EventArgs e)
     private void OnPaused(object? sender, EventArgs e)
@@ -222,18 +225,17 @@ namespace VideoDownloader.Services;
 public class Log
     private static readonly ConcurrentQueue<string> HistoricoDeLogs = new();
     private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "player-debug.log");
-    private static string? Mensagem { get; set; }
+    private static readonly object SyncRoot = new();
+    private static DateTime UltimaRenderizacao = DateTime.MinValue;
+    private static readonly TimeSpan IntervaloMinimo = TimeSpan.FromMilliseconds(250);
     public static string CliAtual { get; set; } = string.Empty;
-    private static int MaxLogsNaTela { get; set; } = 15;
-    private static bool ExibirArquivoLog { get; set; }
+    private static int MaxLogsNaTela { get; set; } = 10;
     public static StringBuilder SB { get; set; } = new();
-    public static StringBuilder SBLog { get; set; } = new();
     public static void Limpar() => SB.Clear();
     public static void Adicionar(string mensagem)
-    public static void Listar(string mensagem) => Listar(mensagem, false);
-    public static void Listar(string mensagem, bool salvarLog)
+    public static void Listar(string mensagem)
     public static void Imprimir()
-    private static void Salvar()
+    public static void Salvar(string mensagem)
     public static string Multi(int vezes = 0, char c = '\t')
 ``` 
  
@@ -262,6 +264,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
     public async Task<StreamResult> StreamAsync(MagnetLink magnet, IProgress<double>? progress = null)
     private async Task EventoHandler(CancellationTokenSource cts, CancellationToken token)
     private async Task MainLoop(CancellationTokenSource cts, CancellationToken token, IProgress<double>? progress)
+    private static async Task GetTrackers(MagnetLink magnet, TorrentManager manager, CancellationToken cancellationToken)
     private async Task<Process?> LoopPlayer(IHttpStream? stream, CancellationToken cancellationToken)
     private static async Task StreamBuffer(TorrentManager manager, CancellationToken cancellationToken)
     private static async Task AtualizarFilaDeDownloadsAsync()
@@ -303,36 +306,37 @@ internal sealed class YoutubeExplodeService(YoutubeClient yt)
 ``` 
  
 ## Análise de Dependências (Graphify) 
-# Graph Report - C:\Users\Vitor\Documents\Repos\Projects\VideoDownloader  (2026-08-14)
+# Graph Report - C:\Users\Vitor\Documents\Repos\Projects\VideoDownloader  (2026-08-15)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 295 nodes · 436 edges · 44 communities (13 shown, 31 thin omitted)
+- 289 nodes · 388 edges · 66 communities (13 shown, 53 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 8 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `75b4254b`
+- Built from commit: `bab5cfee`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- TorrentDownloadService
 - Window
 - PlayerViewModel
+- Log
 - RelayCommand
 - YoutubeDLService
-- VideoDownloader
 - PlayerWindow
 - DownloadApplication
+- VideoDownloader
 - ConsoleDownloadProgressBar
 - Program
 - DownloadApplication
 - YoutubeExplodeService.cs
-- CancellationToken
+- AppSettings
 - CancellationTokenRegistration
+- ClientEngine
 - bool
 - int
 - Container
@@ -340,97 +344,118 @@ internal sealed class YoutubeExplodeService(YoutubeClient yt)
 - libVLC
 - media
 - mediaPlayer
-- Dictionary
+- SuppressMessage
 - DownloadProgress
+- Estado
 - IAudioStreamInfo
+- Id
+- IReadOnlyList
+- IStringLocalizer
 - IVideoStreamInfo
-- List
 - long
+- Nome
+- Peers
+- bool
+- CancellationToken
+- Dictionary
+- ICommand
+- Task
 - Cookie
+- List
 - bool
 - int
 - string
+- Seeds
+- CancellationToken
+- Dictionary
+- IProgress
+- List
+- Log
 - string
+- StringBuilder
+- SuppressMessage
 - Cookie
 - HashSet
 - HashSet
 - IProgress
 - Task
+- StringBuilder
 - Stream
 - StreamManifest
-- StringBuilder
-- SuppressMessage
-- Task
+- Torrent
+- TorrentEstado
+- TorrentProgress
+- TorrentSettings
 - Task
 
 ## God Nodes (most connected - your core abstractions)
-1. `PlayerViewModel` - 33 edges
-2. `TorrentDownloadService` - 23 edges
-3. `Window` - 17 edges
-4. `ControlsWindow` - 17 edges
+1. `PlayerViewModel` - 36 edges
+2. `Window` - 17 edges
+3. `ControlsWindow` - 17 edges
+4. `Log` - 16 edges
 5. `PlayerWindow` - 15 edges
 6. `VideoDownloader` - 13 edges
 7. `YoutubeDLService` - 13 edges
-8. `Log` - 13 edges
-9. `DownloadApplication` - 11 edges
-10. `ConsoleDownloadProgressBar` - 10 edges
+8. `DownloadApplication` - 11 edges
+9. `StreamAsync()` - 11 edges
+10. `MainLoop()` - 11 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `VideoDownloader.Player` --references--> `Microsoft.NET.Sdk`  [EXTRACTED]
+  Player/VideoDownloader.Player.csproj → VideoDownloader.csproj
 - `ControlsWindow` --references--> `Log`  [EXTRACTED]
   Player/ControlsWindow.xaml.cs → Services/Log.cs
 - `PlayerWindow` --references--> `Log`  [EXTRACTED]
   Player/PlayerWindow.xaml.cs → Services/Log.cs
-- `VideoDownloader.Player` --references--> `Microsoft.NET.Sdk`  [EXTRACTED]
-  Player/VideoDownloader.Player.csproj → VideoDownloader.csproj
-- `PlayerViewModel` --references--> `TrackItem`  [EXTRACTED]
-  Player/PlayerViewModel.cs → Player/RelayCommand.cs
 - `PlayerViewModel` --references--> `Log`  [EXTRACTED]
   Player/PlayerViewModel.cs → Services/Log.cs
+- `ControlsWindow` --references--> `PlayerViewModel`  [EXTRACTED]
+  Player/ControlsWindow.xaml.cs → Player/PlayerViewModel.cs
 
 ## Import Cycles
 - None detected.
 
-## Communities (44 total, 31 thin omitted)
+## Communities (66 total, 53 thin omitted)
 
-### Community 0 - "TorrentDownloadService"
+### Community 0 - "Window"
 Cohesion: 0.08
-Nodes (29): AppSettings, CancellationTokenSource, ClientEngine, Estado, Guid, Id, IHttpStream, IReadOnlyList (+21 more)
-
-### Community 1 - "Window"
-Cohesion: 0.07
 Nodes (24): AudioTracks, Position, SubtitleTracks, Volume, DependencyObject, MouseButtonEventArgs, Arrow, Border (+16 more)
 
-### Community 2 - "PlayerViewModel"
-Cohesion: 0.09
-Nodes (19): ConcurrentQueue, double, EventArgs, INotifyPropertyChanged, LibVLC, Media, MediaPlayer, MediaPlayerBufferingEventArgs (+11 more)
+### Community 1 - "PlayerViewModel"
+Cohesion: 0.10
+Nodes (13): Dictionary, double, EventArgs, INotifyPropertyChanged, LibVLC, Media, MediaPlayer, MediaPlayerBufferingEventArgs (+5 more)
+
+### Community 2 - "Log"
+Cohesion: 0.18
+Nodes (21): CancellationToken, CancellationTokenSource, ConcurrentQueue, DateTime, Guid, IHttpStream, IProgress, MagnetLink (+13 more)
 
 ### Community 3 - "RelayCommand"
-Cohesion: 0.09
+Cohesion: 0.08
 Nodes (13): AcessoProjetoPrincipal, Action, VideoDownloader.Player, VideoDownloader.Services, Func, ICommand, Application, App (+5 more)
 
 ### Community 4 - "YoutubeDLService"
 Cohesion: 0.19
 Nodes (9): GeneratedRegex, HttpResponseMessage, IEnumerable, Regex, IProgress, List, Task, YoutubeDLService (+1 more)
 
-### Community 5 - "VideoDownloader"
+### Community 5 - "PlayerWindow"
+Cohesion: 0.14
+Nodes (11): BoolToVisibilityConverter, IsLoading, DispatcherTimer, KeyEventArgs, VideoView, Window, MouseEventArgs, Task (+3 more)
+
+### Community 6 - "DownloadApplication"
+Cohesion: 0.22
+Nodes (7): VideoDownloader, VideoDownloader.Services.Implementation, Task, AcessoProjetoPrincipal, DownloadApplication, SuppressMessage, YoutubeExplodeService
+
+### Community 7 - "VideoDownloader"
 Cohesion: 0.11
 Nodes (18): net10.0, net10.0-windows, LibVLCSharp (3.10.1), LibVLCSharp.WPF (3.10.1), Microsoft.Extensions.DependencyInjection (11.0.0-preview.6.26359.118), Microsoft.Extensions.Localization (11.0.0-preview.6.26359.118), Microsoft.Extensions.Logging (10.0.10), MonoTorrent (3.0.2) (+10 more)
 
-### Community 6 - "PlayerWindow"
-Cohesion: 0.16
-Nodes (10): BoolToVisibilityConverter, IsLoading, DispatcherTimer, KeyEventArgs, VideoView, Window, MouseEventArgs, PlayerWindow (+2 more)
-
-### Community 7 - "DownloadApplication"
-Cohesion: 0.24
-Nodes (6): VideoDownloader.Services.Implementation, SuppressMessage, Task, AcessoProjetoPrincipal, DownloadApplication, YoutubeExplodeService
-
 ### Community 8 - "ConsoleDownloadProgressBar"
-Cohesion: 0.14
-Nodes (12): bool, string, AppSettings, VideoDownloader.Progress, VideoDownloader.Constantes, IDisposable, int, IProgress (+4 more)
+Cohesion: 0.15
+Nodes (11): bool, string, AppSettings, VideoDownloader.Progress, VideoDownloader.Constantes, IDisposable, int, object (+3 more)
 
 ### Community 9 - "Program"
-Cohesion: 0.24
-Nodes (6): Cookie, VideoDownloader, List, Task, Program, ServiceProvider
+Cohesion: 0.31
+Nodes (5): Cookie, List, Task, Program, ServiceProvider
 
 ### Community 10 - "DownloadApplication"
 Cohesion: 0.40
@@ -441,24 +466,24 @@ Cohesion: 0.50
 Nodes (3): VideoDownloader.Youtube.Implementation, YoutubeExplodeService, YoutubeClient
 
 ## Knowledge Gaps
-- **33 isolated node(s):** `VideoDownloader.Resources`, `VideoDownloader.Constantes`, `VideoDownloader.Youtube.Implementation`, `VideoDownloader.Progress`, `Track` (+28 more)
+- **35 isolated node(s):** `VideoDownloader.Resources`, `VideoDownloader.Constantes`, `VideoDownloader.Youtube.Implementation`, `VideoDownloader.Progress`, `Track` (+30 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **31 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **53 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PlayerViewModel` connect `PlayerViewModel` to `ConsoleDownloadProgressBar`, `Window`, `RelayCommand`, `PlayerWindow`?**
-  _High betweenness centrality (0.180) - this node is a cross-community bridge._
-- **Why does `VideoDownloader.Services.Implementation` connect `DownloadApplication` to `TorrentDownloadService`?**
-  _High betweenness centrality (0.139) - this node is a cross-community bridge._
+- **Why does `PlayerViewModel` connect `PlayerViewModel` to `Window`, `Log`, `RelayCommand`, `PlayerWindow`, `ConsoleDownloadProgressBar`?**
+  _High betweenness centrality (0.173) - this node is a cross-community bridge._
+- **Why does `VideoDownloader.Services.Implementation` connect `DownloadApplication` to `Log`?**
+  _High betweenness centrality (0.167) - this node is a cross-community bridge._
+- **Why does `Log` connect `Log` to `Window`, `PlayerViewModel`, `RelayCommand`, `PlayerWindow`, `ConsoleDownloadProgressBar`?**
+  _High betweenness centrality (0.116) - this node is a cross-community bridge._
 - **What connects `VideoDownloader.Resources`, `VideoDownloader.Constantes`, `VideoDownloader.Youtube.Implementation` to the rest of the system?**
-  _33 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `TorrentDownloadService` be split into smaller, more focused modules?**
-  _Cohesion score 0.0824829931972789 - nodes in this community are weakly interconnected._
+  _35 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Window` be split into smaller, more focused modules?**
-  _Cohesion score 0.07307692307692308 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08108108108108109 - nodes in this community are weakly interconnected._
 - **Should `PlayerViewModel` be split into smaller, more focused modules?**
-  _Cohesion score 0.0873015873015873 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09879032258064516 - nodes in this community are weakly interconnected._
 - **Should `RelayCommand` be split into smaller, more focused modules?**
-  _Cohesion score 0.08666666666666667 - nodes in this community are weakly interconnected._ 
+  _Cohesion score 0.08307692307692308 - nodes in this community are weakly interconnected._ 

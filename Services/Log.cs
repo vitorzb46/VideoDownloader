@@ -1,7 +1,6 @@
 using Spectre.Console;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Text;
 
 namespace VideoDownloader.Services;
@@ -11,11 +10,12 @@ public class Log
 {
     private static readonly ConcurrentQueue<string> HistoricoDeLogs = new();
     private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "player-debug.log");
-    private static string? Mensagem { get; set; }
+    private static readonly object SyncRoot = new();
+    private static DateTime UltimaRenderizacao = DateTime.MinValue;
+    private static readonly TimeSpan IntervaloMinimo = TimeSpan.FromMilliseconds(250);
     public static string CliAtual { get; set; } = string.Empty;
-    private static int MaxLogsNaTela { get; set; } = 15;
+    private static int MaxLogsNaTela { get; set; } = 10;
     public static StringBuilder SB { get; set; } = new();
-    public static StringBuilder SBLog { get; set; } = new();
     public static void Limpar() => SB.Clear();
     /// <summary>
     /// Adiciona uma mensagem ao CLI estático.
@@ -23,75 +23,97 @@ public class Log
     /// <param name="mensagem">Mensagem a ser adicionada ao CLI.</param>
     public static void Adicionar(string mensagem)
     {
-        SB.AppendLine(mensagem?.PadRight(110));
+        SB.AppendLine(mensagem);
     }
     /// <summary>
-    /// Adiciona uma mensagem ao histórico de logs e, se <paramref name="salvarLog"/> for<c>true,</c>salva o log em <see cref="player-debug.log"/>.
+    /// Adiciona uma mensagem ao histórico de logs.
     /// </summary>
     /// <param name="mensagem">Mensagem a ser adicionada ao log.</param>
-    /// <param name="salvarLog">Se <c>true</c>, salva o log.</param>
     public static void Listar(string mensagem)
     {
-        Mensagem = mensagem;
-        HistoricoDeLogs.Enqueue(mensagem);        
+        HistoricoDeLogs.Enqueue(mensagem);
         while (HistoricoDeLogs.Count > MaxLogsNaTela)
         {
             HistoricoDeLogs.TryDequeue(out _);
         }
-        Imprimir();
     }
     /// <summary>
-    /// Imprime no console as últimas linhas do histórico de logs. <see cref="MaxLogsNaTela"/>.
+    /// Imprime no console o painel estático + as últimas linhas do histórico de logs.
+    /// Serializado por lock e com coalescência de ticks — os eventos do MonoTorrent disparam
+    /// centenas de vezes por segundo em threads diferentes; renderizar a cada evento
+    /// embaralha o cursor e faz a tela rolar.
     /// </summary>
     public static void Imprimir()
     {
-        SB.Clear();
-        SB.AppendLine(CultureInfo.InvariantCulture, $"[cyan]{Multi(110, '-')}[/]");
-        SB.AppendLine(CultureInfo.InvariantCulture, $"{Multi(30, ' ')}[cyan]=== ÚLTIMOS LOGS DO SISTEMA ===[/]");
-        var exibirLog = HistoricoDeLogs.ToArray().Reverse();
-        foreach (var log in exibirLog)
+        // Coalesce: se a última renderização foi há menos que o intervalo, ignora
+        // (os logs já foram enfileirados e serão exibidos na próxima passagem).
+        lock (SyncRoot)
         {
-            string logFormat = $" {log}".PadRight(110);
-            SB.AppendLine(logFormat);
-        }
-
-        int linhasVazias = MaxLogsNaTela - HistoricoDeLogs.Count;
-        for (int i = 0; i < linhasVazias; i++)
-        {
-            SB.AppendLine(new string(' ', 110));
-        }
-
-        string cli = SB.ToString();
-        if (cli != CliAtual)
-        {
-            Console.SetCursorPosition(0, 0);
-            // Apaga rastros se a string encolheu (ex: se um torrent foi removido)
-            if (cli.Length < CliAtual.Length)
+            var agora = DateTime.UtcNow;
+            if (agora - UltimaRenderizacao < IntervaloMinimo)
             {
-                int diferenca = CliAtual.Length - cli.Length;
-                cli += new string(' ', diferenca);
+                return;
             }
-            try
+            UltimaRenderizacao = agora;
+
+            // Preserva o painel estático montado pelo MainLoop (Adicionar).
+            string painel = SB.ToString();
+
+            var sb = new StringBuilder();
+            sb.Append(painel);
+            sb.Append($"[cyan]{Multi(110, '-')}[/]");
+            sb.AppendLine();
+            sb.Append($"{Multi(30, ' ')}[cyan]=== ÚLTIMOS LOGS DO SISTEMA ===[/]".PadRight(110));
+            sb.AppendLine();
+
+            var exibirLog = HistoricoDeLogs.ToArray().Reverse();
+            foreach (var log in exibirLog)
             {
-                AnsiConsole.MarkupLine(cli);
-            }
-            catch
-            {
-                Console.WriteLine(cli);
+                sb.Append($" {log}".PadRight(110));
+                sb.AppendLine();
             }
 
-            CliAtual = SB.ToString();
+            int linhasVazias = MaxLogsNaTela - HistoricoDeLogs.Count;
+            for (int i = 0; i < linhasVazias; i++)
+            {
+                sb.AppendLine(new string(' ', 110));
+            }
+
+            string cli = sb.ToString();
+            if (cli != CliAtual)
+            {
+                // Apaga rastros se a string encolheu (ex: se um torrent foi removido)
+                if (cli.Length < CliAtual.Length)
+                {
+                    int diferenca = CliAtual.Length - cli.Length;
+                    cli += new string(' ', diferenca);
+                }
+
+                try
+                {
+                    // Volta o cursor ao topo e sobrescreve — evita rolar a tela/duplicar.
+                    Console.SetCursorPosition(0, 0);
+                    AnsiConsole.Markup(cli);
+                }
+                catch
+                {
+                    Console.SetCursorPosition(0, 0);
+                    Console.WriteLine(Markup.Escape(cli));
+                }
+
+                CliAtual = cli;
+            }
         }
     }
     public static void Salvar(string mensagem)
     {
         try
         {
-            File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] VM: {mensagem}{Environment.NewLine}");
+            File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {mensagem}{Environment.NewLine}");
         }
         catch
         {
-            // SB.AppendLine(CultureInfo.InvariantCulture, $"Erro ao salvar string em log: {Mensagem}");
+            // Ignora falhas de escrita em log (best-effort).
         }
     }
     public static string Multi(int vezes = 0, char c = '\t')

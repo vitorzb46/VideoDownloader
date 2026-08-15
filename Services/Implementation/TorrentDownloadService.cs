@@ -139,9 +139,10 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
         Process? player = null;
         try
         {
+            Console.Clear();
             TorrentSettings settingsBuilder = TorrentsConfig(AppContext);
             var manager = await Engine.AddStreamingAsync(magnet, pastaDownload, settingsBuilder).ConfigureAwait(false);
-
+            
             if (manager == null)
             {
                 Log.Salvar(Localizer["Torrent_ErroAoBaixar"]);
@@ -150,11 +151,17 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
 
             //Buscar lista de trackers
             await GetTrackers(magnet, manager, cancellationToken).ConfigureAwait(false);
-
+            
             _torrents[id] = manager;
 
             await EventoHandler(cts, cancellationToken).ConfigureAwait(false);
-
+                        
+            while (manager.State == TorrentState.Metadata)
+            {
+                Log.Listar($"Aguardando {manager.State}...");
+                Log.Imprimir();
+                await Task.Delay(1000).ConfigureAwait(false);
+            }
             var maiorArquivo = manager.Files.OrderBy(t => t.Length).Last();
 
             stream = await manager.StreamProvider!.CreateHttpStreamAsync(maiorArquivo, true, cancellationToken).ConfigureAwait(false);
@@ -181,21 +188,25 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             if (stream != null)
             {
                 Log.Listar("[red]Fechando o servidor de streaming HTTP local...[/]");
+                Log.Imprimir();
                 stream.Dispose();
             }
 
             if (player != null)
             {
                 Log.Listar("[red]Processando encerramento do player...[/]");
+                Log.Imprimir();
 
                 try
                 {
                     int codigoSaida = player.ExitCode;
                     Log.Listar($"[yellow]O player fechou com o código de saída: {codigoSaida}[/]");
+                    Log.Imprimir();
                 }
                 catch (Exception)
                 {
                     Log.Listar("[yellow]Não foi possível capturar o código de saída (processo já destruído).[/]");
+                    Log.Imprimir();
                 }
 
                 try
@@ -214,32 +225,39 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
     {
         foreach (var (id, manager) in _torrents)
         {
+            Log.Limpar();
             string nomeEscapado = Markup.Escape(manager.Name);
             manager.PeersFound += (o, e) =>
             {
                 if (e.NewPeers == 0) return;
                 string peers = $"[cyan]{e.NewPeers}[/]";
                 Log.Listar(Localizer["Torrent_PeersEncontrados", e.GetType().Name, peers, nomeEscapado]);
+                Log.Imprimir();
             };
             manager.PeerConnected += (o, e) =>
             {
                 Log.Listar(Localizer["Torrent_ConexaoSucesso", Markup.Escape(e.Peer.Uri.ToString())]);
+                Log.Imprimir();
             };
             manager.ConnectionAttemptFailed += (o, e) =>
             {
                 Log.Listar(Localizer["Torrent_ConexaoFalha", Markup.Escape(e.Peer.ConnectionUri.ToString())]);
+                Log.Imprimir();
             };
             manager.TorrentStateChanged += async (o, e) =>
             {
                 Log.Listar(Localizer["Torrent_StatusMudanca", nomeEscapado, e.NewState]);
+                Log.Imprimir();
                 if (e.NewState == TorrentState.Error)
                 {
                     Log.Listar(Localizer["Torrent_ErroInterno"]);
+                    Log.Imprimir();
                     await e.TorrentManager.StopAsync().ConfigureAwait(false);
                 }
                 if (e.NewState == TorrentState.Seeding)
                 {
                     Log.Listar(Localizer["Torrent_Sucesso", nomeEscapado]);
+                    Log.Imprimir();
                     if (!AppContext.TorrentSemear)
                     {
                         await e.TorrentManager.StopAsync().ConfigureAwait(false);
@@ -272,7 +290,6 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
             cts.Cancel();
         };
 
-        Console.CursorVisible = false;
         Console.Clear();
 
         while (Engine.IsRunning && !token.IsCancellationRequested)
@@ -377,44 +394,34 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
     private static async Task GetTrackers(MagnetLink magnet, TorrentManager manager, CancellationToken cancellationToken)
     {
         string url = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt";
-        string trackers;
         HttpRequestMessage? request = null;
-        HttpResponseMessage response;
         HttpClient client = new();
-        List<string> trackerList;
-        IEnumerable<string> trackersOriginal;
-        List<string> trackerListFinal;
-        using var ctsTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        ctsTimeout.CancelAfter(TimeSpan.FromSeconds(4));
         using var ctsGitHub = new CancellationTokenSource(TimeSpan.FromSeconds(12));
         try
         {
             request = new HttpRequestMessage(HttpMethod.Get, url);
-            response = await client!.SendAsync(request, ctsGitHub.Token).ConfigureAwait(false);
+            var response = await client!.SendAsync(request, ctsGitHub.Token).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
-            trackers = await response.Content.ReadAsStringAsync(ctsGitHub.Token).ConfigureAwait(false);
-            trackerList = [.. trackers.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
-            trackersOriginal = magnet.AnnounceUrls ?? Enumerable.Empty<string>();
-            trackerListFinal = [.. trackersOriginal.Union(trackerList, StringComparer.OrdinalIgnoreCase)];
+            string trackers = await response.Content.ReadAsStringAsync(ctsGitHub.Token).ConfigureAwait(false);
+            IEnumerable<string> trackerList = [.. trackers.Split('\n',
+                                                                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+            var trackersOriginal = magnet.AnnounceUrls ?? Enumerable.Empty<string>();
+            List<string> trackerListFinal = [.. trackersOriginal.Union(trackerList, StringComparer.OrdinalIgnoreCase)];
 
             Log.Listar("Atualizando os trackers, aguarde...");
-
-            await Task.Run(async () =>
+            Log.Imprimir();
+            var contador = 0;
+            foreach (var tracker in trackerListFinal)
             {
-                var contador = 0;
-                foreach (var tracker in trackerListFinal)
+                if (Uri.TryCreate(tracker, UriKind.Absolute, out Uri? trackerUri))
                 {
-                    if (Uri.TryCreate(tracker, UriKind.Absolute, out Uri? trackerUri))
-                    {
-                        contador++;
-                        Log.Salvar($"[[{contador}/{trackerListFinal.Count}]] {tracker} - adicionado.");
-                        await manager.TrackerManager.AddTrackerAsync(trackerUri).ConfigureAwait(false);
-                        await Task.Delay(250).ConfigureAwait(false);
-                    }
+                    contador++;
+                    Log.Salvar($"[[{contador}/{trackerListFinal.Count}]] {tracker} - adicionado.");
+                    await manager.TrackerManager.AddTrackerAsync(trackerUri).ConfigureAwait(false);
+                    await Task.Delay(250, cancellationToken).ConfigureAwait(false);
                 }
-
-            }, cancellationToken).ConfigureAwait(false);
+            }
 
         }
         catch (OperationCanceledException)
@@ -675,22 +682,7 @@ internal sealed class TorrentDownloadService(ClientEngine engine, AppSettings ap
     {
         var manager = _torrents[id];
 
-        var estado = manager.State switch
-        {
-            TorrentState.Error => TorrentEstado.Erro,
-            TorrentState.Seeding => TorrentEstado.Semeando,
-            TorrentState.Stopped => TorrentEstado.Parado,
-            TorrentState.Downloading => TorrentEstado.Baixando,
-            TorrentState.Paused => TorrentEstado.Pausado,
-            TorrentState.FetchingHashes => TorrentEstado.BuscandoHashs,
-            TorrentState.Hashing => TorrentEstado.VerificandoHash,
-            TorrentState.HashingPaused => TorrentEstado.HashPausado,
-            TorrentState.Starting => TorrentEstado.Iniciando,
-            TorrentState.Stopping => TorrentEstado.Parando,
-            TorrentState.Metadata => TorrentEstado.Metadata,
-            _ when manager.Progress >= 100d => TorrentEstado.Concluido,
-            _ => TorrentEstado.Erro,
-        };
+        var estado = ConverterEstado(manager);
 
         return new TorrentProgress(
             id,
