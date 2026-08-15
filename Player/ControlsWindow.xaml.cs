@@ -41,7 +41,7 @@ public partial class ControlsWindow : Window
     {
         if (e.OriginalSource is MenuItem menuItem && menuItem.DataContext is TrackItem track)
         {
-            Log.Listar($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})", true);
+            Log.Salvar($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})");
             _viewModel.SelectSubtitleTrack(track.Id);
 
             // FECHAMENTO AUTOMÁTICO: Localiza o menu pai e fecha
@@ -54,7 +54,7 @@ public partial class ControlsWindow : Window
     {
         if (e.OriginalSource is MenuItem menuItem && menuItem.DataContext is TrackItem track)
         {
-            Log.Listar($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})", true);
+            Log.Salvar($"ContextMenu Subtitle: faixa {track.Id} ({track.Name})");
             _viewModel.SelectSubtitleTrack(track.Id);
         }
     }
@@ -73,7 +73,7 @@ public partial class ControlsWindow : Window
 
     private void LoadSubtitleButton_Click(object sender, RoutedEventArgs e)
     {
-        Log.Listar("LoadSubtitleButton_Click");
+        Log.Salvar("LoadSubtitleButton_Click");
         var dialog = new OpenFileDialog
         {
             Filter = "Legendas (*.srt;*.vtt)|*.srt;*.vtt|Todos os arquivos (*.*)|*.*",
@@ -82,7 +82,7 @@ public partial class ControlsWindow : Window
 
         if (dialog.ShowDialog(this) == true)
         {
-            Log.Listar("Legenda {dialog.FileName} carregada!", true);
+            Log.Salvar("Legenda {dialog.FileName} carregada!");
             _viewModel.LoadExternalSubtitle(dialog.FileName);
         }
     }

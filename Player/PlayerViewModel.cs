@@ -26,6 +26,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
 
     public PlayerViewModel(LibVLC libVLC, MediaPlayer mediaPlayer)
     {
+        Log.Salvar("PlayerViewModel iniciado");
         _libVLC = libVLC;
         _mediaPlayer = mediaPlayer;
 
@@ -37,7 +38,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         _mediaPlayer.Buffering += OnPlayerBuffering;
         _mediaPlayer.EncounteredError += (_, _) =>
         {
-            Log.Listar($"EncounteredError | State={_mediaPlayer.State} | Mrl={_mediaPlayer.Media?.Mrl}", true);
+            Log.Salvar($"EncounteredError | State={_mediaPlayer.State} | Mrl={_mediaPlayer.Media?.Mrl}");
             // Diagnóstico visível: escreve o erro do VLC em um arquivo de log local.
             try
             {
@@ -108,21 +109,21 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     {
         _media?.Dispose();
         _media = media;
-        Log.Listar($"SetMedia | Mrl={media.Mrl}", true);
+        Log.Salvar($"SetMedia | Mrl={media.Mrl}");
         _mediaPlayer.Play(_media);
-        Log.Listar($"Play() chamado | State={_mediaPlayer.State}", true);
+        Log.Salvar($"Play() chamado | State={_mediaPlayer.State}");
         IsLoading = true;
     }
 
     public void SeekTo(double percent)
     {
-        Log.Listar($"SeekTo | percent={percent:0.0}", true);
+        Log.Salvar($"SeekTo | percent={percent:0.0}");
         _mediaPlayer.Position = (float)Math.Clamp(percent / 100.0, 0.0, 1.0);
     }
 
     public void TogglePlay()
     {
-        Log.Listar($"TogglePlay | IsPlaying={_mediaPlayer.IsPlaying} State={_mediaPlayer.State}", true);
+        Log.Salvar($"TogglePlay | IsPlaying={_mediaPlayer.IsPlaying} State={_mediaPlayer.State}");
         if (_mediaPlayer.IsPlaying)
         {
             _mediaPlayer.Pause();
@@ -184,7 +185,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         AudioTracks.Clear();
         foreach (var t in audioTracks.Where(t => t.Id >= 0))
         {
-            Log.Listar($"AudioTrack: {t.Name}", true);
+            Log.Salvar($"AudioTrack: {t.Name}");
             AudioTracks.Add(new TrackItem(t.Id, NomeDaFaixa(t.Name, "Áudio", t.Id)));
         }
 
@@ -210,7 +211,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
 
         foreach (var item in legendasProcessadas)
         {
-            Log.Listar($"SubtitleTrack: {item.Name}", true);
+            Log.Salvar($"SubtitleTrack: {item.Name}");
             SubtitleTracks.Add(item);
         }
 
@@ -280,7 +281,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
             {
                 if (limpo.Contains(idioma.Key))
                 {
-                    Log.Listar($"Idioma detectado: {idioma.Value}", true);
+                    Log.Salvar($"Idioma detectado: {idioma.Value}");
                     idiomaDetectado = idioma.Value;
                     break;
                 }
@@ -314,23 +315,23 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
 
     private void OnPlaying(object? sender, EventArgs e)
     {
-        Log.Listar($"EVENT Playing | State={_mediaPlayer.State}", true);
+        Log.Salvar($"EVENT Playing | State={_mediaPlayer.State}");
         IsPlaying = true;
         IsLoading = false;
     }
     private void OnPaused(object? sender, EventArgs e)
     {
-        Log.Listar("EVENT Paused", true);
+        Log.Salvar("EVENT Paused");
         IsPlaying = false;
     }
     private void OnStopped(object? sender, EventArgs e)
     {
-        Log.Listar("EVENT Stopped", true);
+        Log.Salvar("EVENT Stopped");
         IsPlaying = false;
     }
     private void OnEndReached(object? sender, EventArgs e)
     {
-        Log.Listar("EVENT EndReached", true);
+        Log.Salvar("EVENT EndReached");
         IsPlaying = false;
     }
     private void OnPlayerBuffering(object? sender, MediaPlayerBufferingEventArgs e)
@@ -342,12 +343,12 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
             if (cachePreenchido < 100)
             {
                 IsLoading = true;
-                Log.Listar($"[ALERTA REDE] Preenchendo buffer: {cachePreenchido:0.0}%", true);
+                Log.Salvar($"[ALERTA REDE] Preenchendo buffer: {cachePreenchido:0.0}%");
             }
             else
             {
                 IsLoading = false;
-                Log.Listar("[ALERTA REDE] Buffer cheio. Continuando reprodução.", true);
+                Log.Salvar("[ALERTA REDE] Buffer cheio. Continuando reprodução.");
             }
         });
     }   
@@ -361,7 +362,7 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        Log.Listar("Dispose do ViewModel iniciado", true);
+        Log.Salvar("Dispose do ViewModel iniciado");
 
         // Remove imediatamente as inscrições de eventos para evitar callbacks fantasmas
         _mediaPlayer.PositionChanged -= OnPositionChanged;
@@ -387,10 +388,9 @@ public sealed class PlayerViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (Exception ex)
         {
-            Log.Listar($"Erro durante o dispose nativo do VLC: {ex.Message}", true);
+            Log.Salvar($"Erro durante o dispose nativo do VLC: {ex.Message}");
         }
 
-        Log.Listar("Dispose do ViewModel concluído", true);
-        Log.Imprimir();
+        Log.Salvar("Dispose do ViewModel concluído");
     }
 }

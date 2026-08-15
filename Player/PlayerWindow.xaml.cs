@@ -15,7 +15,7 @@ public partial class PlayerWindow : Window
 
     public PlayerWindow(string mediaUrl)
     {
-        Log.Listar($"PlayerWindow ctor | mediaUrl={mediaUrl}", true);
+        Log.Salvar($"PlayerWindow ctor | mediaUrl={mediaUrl}");
         InitializeComponent();
 
         Core.Initialize();
@@ -26,7 +26,7 @@ public partial class PlayerWindow : Window
         DataContext = _viewModel;
 
         VideoView.MediaPlayer = mediaPlayer;
-        Log.Listar("MediaPlayer associado ao VideoView", true);
+        Log.Salvar("MediaPlayer associado ao VideoView");
 
         // Janela de controles separada (evita o airspace do HWND nativo bloquear os cliques).
         // Owner é atribuído no Loaded (a janela dona precisa estar visível antes).
@@ -43,7 +43,7 @@ public partial class PlayerWindow : Window
 
         Loaded += (_, _) =>
         {
-            Log.Listar("Loaded disparado — posicionando controles", true);
+            Log.Salvar("Loaded disparado — posicionando controles");
             // Owner garante que a janela de controles fique sempre à frente do player.
             _controls.Owner = this;
 
@@ -59,11 +59,11 @@ public partial class PlayerWindow : Window
             try
             {
                 await IniciarAsync(mediaUrl);
-                Log.Listar("IniciarAsync concluído", true);
+                Log.Salvar("IniciarAsync concluído");
             }
             catch (Exception ex)
             {
-                Log.Listar($"IniciarAsync EXCEPTION: {ex}", true);
+                Log.Salvar($"IniciarAsync EXCEPTION: {ex}");
                 File.AppendAllText(
                     Path.Combine(AppContext.BaseDirectory, "vlc-errors.log"),
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] IniciarAsync EXCEPTION: {ex}{Environment.NewLine}");
@@ -73,8 +73,7 @@ public partial class PlayerWindow : Window
         };
         Closed += (_, _) =>
         {
-            Log.Listar("Window fechada — dispose do ViewModel", true);
-            Log.Imprimir();
+            Log.Salvar("Window fechada — dispose do ViewModel");
             _inactivityTimer.Stop();
             _controls.Close();
             _viewModel.Dispose();
@@ -90,7 +89,7 @@ public partial class PlayerWindow : Window
     private async Task IniciarAsync(string mediaUrl)
     {
         _viewModel.IsLoading = true;
-        Log.Listar("Criando Media", true);
+        Log.Salvar("Criando Media");
         // Sem 'using': o PlayerViewModel é o dono do Media e faz o Dispose no fechamento.
         var media = new Media(_viewModel.LibVLC, mediaUrl, FromType.FromLocation);
 
@@ -103,9 +102,9 @@ public partial class PlayerWindow : Window
         media.AddOption(":clock-jitter=5000");
 
         _viewModel.SetMedia(media);
-        Log.Listar("SetMedia + Play chamados", true);
+        Log.Salvar("SetMedia + Play chamados");
         await _viewModel.PopulateTracksAsync();
-        Log.Listar("PopulateTracksAsync concluído", true);
+        Log.Salvar("PopulateTracksAsync concluído");
         ShowControls();
     }
 
