@@ -14,7 +14,6 @@ public class Log
     private static string? Mensagem { get; set; }
     public static string CliAtual { get; set; } = string.Empty;
     private static int MaxLogsNaTela { get; set; } = 15;
-    private static bool ExibirArquivoLog { get; set; }
     public static StringBuilder SB { get; set; } = new();
     public static StringBuilder SBLog { get; set; } = new();
     public static void Limpar() => SB.Clear();
@@ -31,27 +30,22 @@ public class Log
     /// </summary>
     /// <param name="mensagem">Mensagem a ser adicionada ao log.</param>
     /// <param name="salvarLog">Se <c>true</c>, salva o log.</param>
-    public static void Listar(string mensagem) => Listar(mensagem, false);
-    public static void Listar(string mensagem, bool salvarLog)
+    public static void Listar(string mensagem)
     {
         Mensagem = mensagem;
-        HistoricoDeLogs.Enqueue(mensagem);
-        if (salvarLog is true)
-        {
-            ExibirArquivoLog = true;
-            Salvar();
-        }
+        HistoricoDeLogs.Enqueue(mensagem);        
         while (HistoricoDeLogs.Count > MaxLogsNaTela)
         {
             HistoricoDeLogs.TryDequeue(out _);
         }
+        Imprimir();
     }
     /// <summary>
     /// Imprime no console as últimas linhas do histórico de logs. <see cref="MaxLogsNaTela"/>.
     /// </summary>
     public static void Imprimir()
     {
-        Limpar();
+        SB.Clear();
         SB.AppendLine(CultureInfo.InvariantCulture, $"[cyan]{Multi(110, '-')}[/]");
         SB.AppendLine(CultureInfo.InvariantCulture, $"{Multi(30, ' ')}[cyan]=== ÚLTIMOS LOGS DO SISTEMA ===[/]");
         var exibirLog = HistoricoDeLogs.ToArray().Reverse();
@@ -89,20 +83,15 @@ public class Log
             CliAtual = SB.ToString();
         }
     }
-    private static void Salvar()
+    public static void Salvar(string mensagem)
     {
-        if (ExibirArquivoLog)
+        try
         {
-            try
-            {
-                File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] VM: {Mensagem}{Environment.NewLine}");
-            }
-            catch
-            {
-                SB.AppendLine(CultureInfo.InvariantCulture, $"Erro ao salvar string em log: {Mensagem}");
-            }
-            Imprimir();
-            ExibirArquivoLog = false;
+            File.AppendAllText(LogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] VM: {mensagem}{Environment.NewLine}");
+        }
+        catch
+        {
+            // SB.AppendLine(CultureInfo.InvariantCulture, $"Erro ao salvar string em log: {Mensagem}");
         }
     }
     public static string Multi(int vezes = 0, char c = '\t')
